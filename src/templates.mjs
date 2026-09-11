@@ -74,7 +74,7 @@ export function layout({ title, description, path, siteUrl, verification, struct
         if (navigator.doNotTrack === '1') return;
         var referrer = '';
         try { referrer = document.referrer ? new URL(document.referrer).origin : ''; } catch (_) {}
-        var payload = JSON.stringify({ path: location.pathname, referrerOrigin: referrer });
+        var payload = JSON.stringify({ eventId: crypto.randomUUID(), path: location.pathname, referrerOrigin: referrer });
         var body = new Blob([payload], { type: 'application/json' });
         if (navigator.sendBeacon) navigator.sendBeacon('/api/collect', body);
         else fetch('/api/collect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: payload, keepalive: true });
