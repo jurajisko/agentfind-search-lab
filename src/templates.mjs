@@ -65,6 +65,21 @@ export function layout({ title, description, path, siteUrl, verification, struct
       <p><strong>Search Lab</strong> je transparentný obsahový experiment AgentFindu.</p>
       <p>Nemeriame „AI ranking“. Sledujeme indexáciu, vyhľadávacie dopyty a technickú čitateľnosť stránok.</p>
     </footer>
+    <script>
+      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+    <script>
+      (function () {
+        if (navigator.doNotTrack === '1') return;
+        var referrer = '';
+        try { referrer = document.referrer ? new URL(document.referrer).origin : ''; } catch (_) {}
+        var payload = JSON.stringify({ path: location.pathname, referrerOrigin: referrer });
+        var body = new Blob([payload], { type: 'application/json' });
+        if (navigator.sendBeacon) navigator.sendBeacon('/api/collect', body);
+        else fetch('/api/collect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: payload, keepalive: true });
+      }());
+    </script>
   </body>
 </html>`;
 }
