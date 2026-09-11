@@ -4,8 +4,10 @@
 
 | Udalosť | Zdroj | Dáta |
 |---|---|---|
-| `human_pageview` | malý first-party skript v stránke | cesta, doména referrera, čas |
+| `browser_pageview` | malý first-party skript v stránke | cesta, doména referrera, čas |
 | `claimed_crawler_request` | Vercel Middleware pred statickou stránkou | cesta, deklarovaný crawler, user-agent, čas |
+
+`browser_pageview` neznamená automaticky človeka: je to iba požiadavka z prehliadača, v ktorom sa spustil JavaScript. Väčšina bežných search botov JavaScript nespúšťa, ale niektoré automatizované prehliadače ho spustiť môžu.
 
 Neukladáme IP adresy, cookies, úplné URL referrerov ani vyhľadávacie frázy návštevníkov.
 

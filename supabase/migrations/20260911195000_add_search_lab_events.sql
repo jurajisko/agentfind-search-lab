@@ -1,6 +1,6 @@
 create table if not exists public.search_lab_events (
   id bigint generated always as identity primary key,
-  event_type text not null check (event_type in ('human_pageview', 'claimed_crawler_request')),
+  event_type text not null check (event_type in ('browser_pageview', 'claimed_crawler_request')),
   path text not null check (char_length(path) <= 500),
   referrer_origin text,
   crawler_name text,

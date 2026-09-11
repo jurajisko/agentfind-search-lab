@@ -38,7 +38,7 @@ export default {
     if (!supabaseUrl || !serviceKey) return new Response(null, { status: 204 });
 
     const event = {
-      event_type: 'human_pageview',
+      event_type: 'browser_pageview',
       path,
       referrer_origin: normalizeOrigin(payload.referrerOrigin),
       crawler_name: null,
