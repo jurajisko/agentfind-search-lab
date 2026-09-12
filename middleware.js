@@ -133,5 +133,5 @@ export default async function middleware(request, event) {
 // stylesheet is the signal that separates a renderer from a text scraper.
 // Only the collector endpoint and Vercel internals are excluded.
 export const config = {
-  matcher: ['/((?!api/|_vercel/).*)']
+  matcher: ['/((?!api/|_vercel/|admin).*)']
 };
