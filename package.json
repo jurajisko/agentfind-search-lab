@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node --check scripts/build.mjs && node --check src/content.mjs && node --check src/templates.mjs"
+    "check": "node --check scripts/build.mjs && node --check src/content.mjs && node --check src/templates.mjs && node --check middleware.js && node --check scripts/seed-test-events.mjs && node --test middleware.test.mjs"
   }
 }
