@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guides, sections as rawSections, variantFor } from '../src/content.mjs';
+import { renderAdmin } from '../src/admin.mjs';
 import { renderGuide, renderHome, renderResearch, renderSection } from '../src/templates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,9 @@ await write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmln
 await write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${url('/sitemap.xml')}\n`);
 await write('site.webmanifest', JSON.stringify({ name: 'Search Lab', short_name: 'Search Lab', start_url: '/', display: 'browser', lang: 'sk' }, null, 2));
 
+// Internal reporting page: noindex, never linked, and kept out of the sitemap.
+await write('admin/index.html', renderAdmin());
+
 const css = await import('node:fs/promises').then(fs => fs.readFile(path.join(root, 'src/styles.css'), 'utf8'));
 await write('styles.css', css);
-console.log(`Built ${sitemapPaths.length} indexable pages in dist for ${siteUrl}`);
+console.log(`Built ${sitemapPaths.length} indexable pages plus /admin/ in dist for ${siteUrl}`);
