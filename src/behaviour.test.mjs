@@ -24,6 +24,28 @@ test('splits AI agents by purpose', () => {
   assert.equal(identify('Mozilla/5.0 (compatible; Perplexity-User/1.0)').purpose, 'user_fetch');
 });
 
+test('recognises agents added from vendor documentation (2026-09-24)', () => {
+  const cases = [
+    ['Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OAI-AdsBot/1.0; +https://openai.com/adsbot', 'OAI-AdsBot (OpenAI)', 'mixed'],
+    ['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot', 'OAI-SearchBot (OpenAI)', 'ai_search'],
+    ['Mozilla/5.0 (compatible; Google-Agent)', 'Google-Agent', 'user_fetch'],
+    ['Google-GeminiNotebook', 'Google-GeminiNotebook', 'user_fetch'],
+    ['meta-webindexer/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)', 'Meta-WebIndexer', 'ai_search'],
+    ['Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; MistralAI-Index/1.0; +https://docs.mistral.ai/robots)', 'MistralAI-Index', 'ai_search'],
+    ['Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; MistralAI-Training/1.0; +https://docs.mistral.ai/robots)', 'MistralAI-Training', 'training'],
+    ['GrokBot/1.0', 'Grok / xAI (neoficialny token)', 'mixed']
+  ];
+  for (const [ua, name, purpose] of cases) {
+    const id = identify(ua);
+    assert.equal(id.name, name, ua);
+    assert.equal(id.category, 'ai', ua);
+    assert.equal(id.purpose, purpose, ua);
+  }
+  // OpenAI's search bot hides behind a full Mac Chrome string; it must not be
+  // mistaken for a browser.
+  assert.notEqual(identify(cases[1][0]).category, 'browser');
+});
+
 test('recognises what our probes actually produced', () => {
   // Gemini's live fetcher sent the bare string "Google".
   const gemini = identify('Google');
