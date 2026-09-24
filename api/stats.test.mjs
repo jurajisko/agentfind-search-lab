@@ -30,6 +30,34 @@ test('only GET is accepted', async () => {
   assert.equal((await call({ Authorization: 'Bearer correct-horse' }, 'POST')).status, 405);
 });
 
+test('with the right password returns the analysed report and hides test rows', async () => {
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
+  process.env.ADMIN_PASSWORD = 'correct-horse';
+  const rows = [
+    { event_type: 'claimed_crawler_request', path: '/robots.txt', user_agent: 'Mozilla/5.0 (compatible; GPTBot/1.2)', resource_kind: 'robots', metadata: {}, occurred_at: '2026-09-20T10:00:00.000Z' },
+    { event_type: 'observed_request', path: '/priroda/', user_agent: 'curl/8.5.0', resource_kind: 'section', metadata: {}, occurred_at: '2026-09-20T10:01:00.000Z' },
+    { event_type: 'observed_request', path: '/', user_agent: 'curl/8.21.0', resource_kind: 'home', metadata: { is_test: true }, occurred_at: '2026-09-20T10:02:00.000Z' }
+  ];
+  const realFetch = globalThis.fetch;
+  let requestedUrl = '';
+  globalThis.fetch = async url => { requestedUrl = String(url); return new Response(JSON.stringify(rows), { status: 200 }); };
+  try {
+    const response = await call({ Authorization: 'Bearer correct-horse' });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.ok(requestedUrl.startsWith('https://example.supabase.co/rest/v1/search_lab_events?'));
+    assert.equal(body.rowsRead, 3);
+    assert.equal(body.testRowsHidden, 1);
+    assert.equal(body.totals.fetches, 2);
+    assert.equal(body.purposes.find(p => p.id === 'training').requests, 1);
+    assert.equal(body.agents.find(a => a.name === 'curl').category, 'tool');
+    assert.ok(!JSON.stringify(body).includes('service-key'));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test('never echoes the service key or password in an error body', async () => {
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key-should-not-leak';
