@@ -39,19 +39,30 @@ test('with the right password returns the analysed report and hides test rows', 
     { event_type: 'observed_request', path: '/priroda/', user_agent: 'curl/8.5.0', resource_kind: 'section', metadata: {}, occurred_at: '2026-09-20T10:01:00.000Z' },
     { event_type: 'observed_request', path: '/', user_agent: 'curl/8.21.0', resource_kind: 'home', metadata: { is_test: true }, occurred_at: '2026-09-20T10:02:00.000Z' }
   ];
+  const audit = { score: 90, counts: { ok: 9, warn: 1, fail: 0, test: 3 }, pages: 59, stages: [{ id: 'access', score: 100 }], checks: [{ id: 'x', stage: 'access', status: 'warn', title: 'Test', result: 'r', why: 'w', evidence: 'documented', weight: 1 }] };
   const realFetch = globalThis.fetch;
-  let requestedUrl = '';
-  globalThis.fetch = async url => { requestedUrl = String(url); return new Response(JSON.stringify(rows), { status: 200 }); };
+  const requested = [];
+  globalThis.fetch = async url => {
+    requested.push(String(url));
+    const body = String(url).endsWith('/admin/audit.json') ? audit : rows;
+    return new Response(JSON.stringify(body), { status: 200 });
+  };
   try {
     const response = await call({ Authorization: 'Bearer correct-horse' });
     assert.equal(response.status, 200);
     const body = await response.json();
-    assert.ok(requestedUrl.startsWith('https://example.supabase.co/rest/v1/search_lab_events?'));
+    assert.ok(requested.some(u => u.startsWith('https://example.supabase.co/rest/v1/search_lab_events?')));
+    assert.ok(requested.includes('https://lab.test/admin/audit.json'));
     assert.equal(body.rowsRead, 3);
     assert.equal(body.testRowsHidden, 1);
     assert.equal(body.totals.fetches, 2);
     assert.equal(body.purposes.find(p => p.id === 'training').requests, 1);
     assert.equal(body.agents.find(a => a.name === 'curl').category, 'tool');
+    // The human report and its exports come with the numbers.
+    assert.equal(body.report.auditScore, 90);
+    assert.ok(body.reportHtml.includes('Zhrnutie'));
+    assert.ok(body.reportDocument.startsWith('<!doctype html>'));
+    assert.ok(body.agentsCsv.startsWith('﻿Agent;'));
     assert.ok(!JSON.stringify(body).includes('service-key'));
   } finally {
     globalThis.fetch = realFetch;

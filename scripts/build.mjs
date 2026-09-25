@@ -3,6 +3,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guides, sections as rawSections, variantFor } from '../src/content.mjs';
 import { renderAdmin } from '../src/admin.mjs';
+import { renderAccessibleAdmin } from '../src/admin-accessible.mjs';
+import { auditSite } from '../src/audit.mjs';
+import { guideJson, guideMarkdown, jsonPath, llmsFullTxt, llmsTxt, markdownPath } from '../src/formats.mjs';
 import { renderGuide, renderHome, renderResearch, renderSection } from '../src/templates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -29,10 +32,14 @@ const sections = rawSections.map(([slug, label]) => ({ slug, label, description:
 if (guides.length !== 50) throw new Error(`Expected 50 guides, found ${guides.length}.`);
 if (new Set(guides.map(guide => `${guide.section}/${guide.slug}`)).size !== guides.length) throw new Error('Guide paths must be unique.');
 
+// Everything written is also kept in memory so the readiness audit can read
+// the finished site without a second pass over the disk.
+const built = new Map();
 const write = async (relativePath, contents) => {
   const target = path.join(dist, relativePath);
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, contents, 'utf8');
+  built.set(relativePath.replace(/\\/g, '/'), contents);
 };
 
 const sectionFor = slug => sections.find(section => section.slug === slug);
@@ -65,15 +72,28 @@ for (const section of sections) {
 for (const guide of augmentedGuides) {
   const related = augmentedGuides.filter(item => item.section === guide.section && item.slug !== guide.slug).slice(0, 3);
   await write(`${guide.section}/${guide.slug}/index.html`, renderGuide({ guide, section: sectionFor(guide.section), related, siteUrl, verification }));
+  // Same guide in other formats, to measure which one crawlers ask for.
+  // Kept out of the sitemap and served with noindex (vercel.json): they are
+  // alternates of the HTML page, not pages of their own.
+  await write(markdownPath(guide).slice(1), guideMarkdown(guide, { section: sectionFor(guide.section), siteUrl }));
+  await write(jsonPath(guide).slice(1), guideJson(guide, { section: sectionFor(guide.section), siteUrl }));
 }
+await write('llms.txt', llmsTxt({ guides: augmentedGuides, sections, siteUrl }));
+await write('llms-full.txt', llmsFullTxt({ guides: augmentedGuides, sections, siteUrl }));
 
 const sitemapPaths = ['/', '/research/', ...sections.map(section => `/${section.slug}/`), ...augmentedGuides.map(guidePath)];
 await write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapPaths.map(item => `  <url><loc>${url(item)}</loc></url>`).join('\n')}\n</urlset>\n`);
 await write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${url('/sitemap.xml')}\n`);
 await write('site.webmanifest', JSON.stringify({ name: 'Search Lab', short_name: 'Search Lab', start_url: '/', display: 'browser', lang: 'sk' }, null, 2));
 
-// Internal reporting page: noindex, never linked, and kept out of the sitemap.
+// Readiness audit of the site just built. Served next to the admin page; the
+// stats endpoint reads it from there to write the report.
+const audit = auditSite(built, { siteUrl });
+await write('admin/audit.json', `${JSON.stringify({ generatedAt: new Date().toISOString(), siteUrl, ...audit }, null, 2)}\n`);
+
+// Internal reporting pages: noindex, never linked, and kept out of the sitemap.
 await write('admin/index.html', renderAdmin());
+await write('admin/pristupna/index.html', renderAccessibleAdmin());
 
 const css = await import('node:fs/promises').then(fs => fs.readFile(path.join(root, 'src/styles.css'), 'utf8'));
 await write('styles.css', css);

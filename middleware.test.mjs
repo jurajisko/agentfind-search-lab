@@ -49,3 +49,14 @@ test('separates the resources that reveal rendering behaviour', () => {
   assert.equal(resourceKindFrom('/priroda/'), 'section');
   assert.equal(resourceKindFrom('/priroda/pozorovanie-vtakov/'), 'guide');
 });
+
+test('tells alternate formats of a guide apart from the HTML page', () => {
+  assert.equal(resourceKindFrom('/priroda/pozorovanie-vtakov.md'), 'guide_md');
+  assert.equal(resourceKindFrom('/priroda/pozorovanie-vtakov.json'), 'guide_json');
+  assert.equal(resourceKindFrom('/llms.txt'), 'llms_txt');
+  assert.equal(resourceKindFrom('/llms-full.txt'), 'llms_full');
+  // Unchanged neighbours.
+  assert.equal(resourceKindFrom('/priroda/pozorovanie-vtakov'), 'guide');
+  assert.equal(resourceKindFrom('/priroda/'), 'section');
+  assert.equal(resourceKindFrom('/robots.txt'), 'robots');
+});

@@ -136,6 +136,30 @@ test('reports AI purposes even when a purpose has no traffic', () => {
   assert.equal(userFetch.requests, 0);
 });
 
+test('reports which format each agent took for the same guide', () => {
+  const claude = 'Claude-User (claude-code/2.1.269; +https://support.anthropic.com/)';
+  const gpt = 'Mozilla/5.0 (compatible; GPTBot/1.2)';
+  const report = analyse([
+    fetch('2026-09-26T10:00:00.000Z', '/llms.txt', claude, null),
+    fetch('2026-09-26T10:00:01.000Z', '/priroda/pozorovanie-vtakov.md', claude, null),
+    fetch('2026-09-26T11:00:00.000Z', '/priroda/pozorovanie-vtakov/', gpt, null),
+    fetch('2026-09-26T11:00:02.000Z', '/priroda/pozorovanie-vtakov.json', gpt, null),
+    fetch('2026-09-26T11:00:05.000Z', '/vesmir/fazy-mesiaca/', gpt, null)
+  ]);
+  const f = report.formats;
+  assert.equal(f.totals.guide, 2);
+  assert.equal(f.totals.guide_md, 1);
+  assert.equal(f.totals.guide_json, 1);
+  assert.equal(f.totals.llms_txt, 1);
+  // Claude skipped the HTML entirely; GPTBot took HTML plus JSON for one guide
+  // and HTML only for the other.
+  assert.deepEqual(f.pairs, { htmlOnly: 1, alternateOnly: 1, both: 1 });
+  const byName = Object.fromEntries(f.agents.map(a => [a.name, a]));
+  assert.deepEqual(byName['Claude-User (Anthropic)'].counts, { llms_txt: 1, guide_md: 1 });
+  // Alternate formats are not pages, so they do not trigger the no-JS signal.
+  assert.equal(report.agents.find(a => a.name === 'Claude-User (Anthropic)').pages, 0);
+});
+
 test('derives the resource kind for rows written before the column existed', () => {
   const report = analyse([
     fetch('2026-09-11T19:06:58.000Z', '/robots.txt', 'Mozilla/5.0 (compatible; Googlebot/2.1)', null)

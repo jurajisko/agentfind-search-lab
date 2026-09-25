@@ -35,6 +35,50 @@ export const SUSPECT_AT = 15;
 
 const PAGE_KINDS = new Set(['guide', 'section', 'home', 'research']);
 const ASSET_KINDS = new Set(['stylesheet', 'icon', 'manifest']);
+
+// Representations of the same guide content. Which one an agent asks for is
+// the experiment's question.
+export const FORMATS = [
+  ['guide', 'HTML'],
+  ['guide_md', 'Markdown'],
+  ['guide_json', 'JSON'],
+  ['llms_txt', 'llms.txt'],
+  ['llms_full', 'llms-full.txt']
+];
+const FORMAT_KINDS = new Set(FORMATS.map(([id]) => id));
+
+// Bot groups for the report charts. The order is the chart's colour order and
+// was validated for colour-vision deficiency in both themes: keep it.
+export const GROUPS = [
+  ['search', 'Vyhľadávače'],
+  ['ai_search', 'AI vyhľadávanie (index)'],
+  ['ai_user', 'AI na žiadosť používateľa'],
+  ['other', 'Ostatní boti a skripty'],
+  ['ai_training', 'AI trénovanie'],
+  ['hidden', 'Skrytí boti']
+];
+export function groupOf(agent) {
+  if (agent.category === 'browser') return null; // people, not bots
+  if (agent.category === 'search') return 'search';
+  if (agent.category === 'hidden') return 'hidden';
+  if (agent.category === 'ai') {
+    if (agent.purpose === 'ai_search') return 'ai_search';
+    if (agent.purpose === 'user_fetch') return 'ai_user';
+    if (agent.purpose === 'training') return 'ai_training';
+  }
+  return 'other';
+}
+
+/** Wilson score interval, 95 %. Honest about small samples, unlike k/n alone. */
+export function wilson(k, n, z = 1.96) {
+  if (!n) return { low: 0, high: 0 };
+  const p = k / n;
+  const denom = 1 + (z * z) / n;
+  const centre = (p + (z * z) / (2 * n)) / denom;
+  const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denom;
+  return { low: Math.max(0, centre - half), high: Math.min(1, centre + half) };
+}
+const guideKey = path => path.replace(/\.(md|json)$/, '').replace(/\/$/, '');
 const MULTI_UA_WINDOW = 3000;
 const REPEAT_WINDOW = 5000;
 const JS_WINDOW = 60000;
@@ -118,7 +162,8 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
         key: f.key, name: f.id.name, category: f.id.category, purpose: f.id.purpose, named: f.id.named,
         requests: 0, pages: 0, assets: 0, robots: 0, sitemap: 0, pagesWithoutJs: 0,
         paths: new Map(), uas: new Map(), hours: new Map(), minutes: new Map(), lastByPath: new Map(),
-        repeat: false, firstSeen: f.at, lastSeen: f.at, events: []
+        repeat: false, firstSeen: f.at, lastSeen: f.at, events: [],
+        formats: new Map(), guideFormats: new Map()
       };
       agents.set(f.key, a);
     }
@@ -140,6 +185,14 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
     if (f.at < a.firstSeen) a.firstSeen = f.at;
     if (f.at > a.lastSeen) a.lastSeen = f.at;
     a.events.push({ at: f.at, path: f.path, kind: f.kind });
+    if (FORMAT_KINDS.has(f.kind)) {
+      bump(a.formats, f.kind);
+      if (f.kind === 'guide' || f.kind === 'guide_md' || f.kind === 'guide_json') {
+        const key = guideKey(f.path);
+        if (!a.guideFormats.has(key)) a.guideFormats.set(key, new Set());
+        a.guideFormats.get(key).add(f.kind);
+      }
+    }
   }
 
   const agentList = [...agents.values()].map(a => {
@@ -187,6 +240,14 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
       lastSeen: a.lastSeen,
       role: ROLES[a.name] || null,
       topPaths: top(a.paths, 30),
+      formats: Object.fromEntries(a.formats),
+      // Per guide: did the agent take only the HTML, only an alternate, or both?
+      guidePairs: [...a.guideFormats.values()].reduce((acc, kinds) => {
+        const html = kinds.has('guide');
+        const alt = kinds.has('guide_md') || kinds.has('guide_json');
+        if (html && alt) acc.both++; else if (alt) acc.alternateOnly++; else if (html) acc.htmlOnly++;
+        return acc;
+      }, { htmlOnly: 0, alternateOnly: 0, both: 0 }),
       hours: [...a.hours.entries()].sort(),
       events: a.events.slice(-40).reverse()
     };
@@ -254,7 +315,67 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
     };
   }
 
+  const formatAgents = agentList.filter(a => Object.keys(a.formats).length);
+  const formatCategories = new Map();
+  for (const a of formatAgents) {
+    const counts = formatCategories.get(a.category) || {};
+    for (const [kind, n] of Object.entries(a.formats)) counts[kind] = (counts[kind] || 0) + n;
+    formatCategories.set(a.category, counts);
+  }
+  const formats = {
+    columns: FORMATS.map(([id, label]) => ({ id, label })),
+    totals: Object.fromEntries(FORMATS.map(([id]) => [id, formatAgents.reduce((sum, a) => sum + (a.formats[id] || 0), 0)])),
+    byCategory: [...formatCategories.entries()].map(([id, counts]) => ({ id, label: CATEGORIES[id]?.label || id, counts })),
+    agents: formatAgents
+      .map(a => ({ key: a.key, name: a.name, category: a.category, purpose: a.purpose, named: a.named, counts: a.formats, pairs: a.guidePairs }))
+      .sort((x, y) => Object.values(y.counts).reduce((s, n) => s + n, 0) - Object.values(x.counts).reduce((s, n) => s + n, 0))
+      .slice(0, 40),
+    pairs: formatAgents.reduce((acc, a) => ({
+      htmlOnly: acc.htmlOnly + a.guidePairs.htmlOnly,
+      alternateOnly: acc.alternateOnly + a.guidePairs.alternateOnly,
+      both: acc.both + a.guidePairs.both
+    }), { htmlOnly: 0, alternateOnly: 0, both: 0 })
+  };
+
+  // ---- report series: per day by bot group, and content coverage ----
+  const groupByKey = new Map(agentList.map(a => [a.key, groupOf(a)]));
+  const daily = new Map();
+  const reached = new Map(GROUPS.map(([id]) => [id, new Set()]));
+  for (const f of fetches) {
+    const group = groupByKey.get(f.key);
+    if (!group) continue;
+    const day = f.at.slice(0, 10);
+    const bucket = daily.get(day) || {};
+    bucket[group] = (bucket[group] || 0) + 1;
+    daily.set(day, bucket);
+    if (f.kind === 'guide' || f.kind === 'guide_md' || f.kind === 'guide_json') reached.get(group).add(guideKey(f.path));
+  }
+  const days = [...daily.keys()].sort();
+  const timeline = [];
+  if (days.length) {
+    for (let t = Date.parse(`${days[0]}T00:00:00Z`); t <= Date.parse(`${days[days.length - 1]}T00:00:00Z`); t += 86400000) {
+      const day = new Date(t).toISOString().slice(0, 10);
+      timeline.push({ day, counts: daily.get(day) || {} });
+    }
+  }
+  const publishedByVariant = { structured: 0, baseline: 0 };
+  for (const v of variantByPath.values()) if (v in publishedByVariant) publishedByVariant[v]++;
+  const coverage = GROUPS.map(([id, label]) => {
+    const keys = [...reached.get(id)];
+    const byVariant = {};
+    for (const variant of ['structured', 'baseline']) {
+      const k = keys.filter(key => variantByPath.get(`${key}/`) === variant).length;
+      const n = publishedByVariant[variant];
+      byVariant[variant] = { fetched: k, published: n, share: n ? k / n : 0, interval: wilson(k, n) };
+    }
+    return { id, label, guides: keys.length, byVariant };
+  });
+
   return {
+    groups: GROUPS.map(([id, label]) => ({ id, label })),
+    timeline,
+    coverage,
+    formats,
     totals: {
       fetches: fetches.length,
       pageviews: [...pageviewTimes.values()].reduce((sum, list) => sum + list.length, 0),

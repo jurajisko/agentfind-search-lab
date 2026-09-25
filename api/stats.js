@@ -12,6 +12,21 @@
  */
 import { guides, variantFor } from '../src/content.mjs';
 import { analyse } from '../src/behaviour.mjs';
+import { agentsCsv, buildReport, renderReportDocument, renderReportHtml } from '../src/report.mjs';
+
+// The readiness audit is computed at build time and published next to the
+// admin page. Anything that does not look like an audit is ignored rather
+// than trusted.
+async function loadAudit(requestUrl) {
+  try {
+    const response = await fetch(new URL('/admin/audit.json', requestUrl), { signal: AbortSignal.timeout(4000) });
+    if (!response.ok) return null;
+    const audit = await response.json();
+    return audit && Array.isArray(audit.checks) && Array.isArray(audit.stages) ? audit : null;
+  } catch {
+    return null;
+  }
+}
 
 const ROW_LIMIT = 10000;
 const MAX_DAYS = 90;
@@ -79,16 +94,25 @@ export default {
     const all = Array.isArray(rows) ? rows : [];
     const isTest = row => String(row?.metadata?.is_test) === 'true';
     const used = includeTests ? all : all.filter(row => !isTest(row));
-    const report = analyse(used, { variantByPath });
+    const stats = analyse(used, { variantByPath });
+    const generatedAt = new Date().toISOString();
+    const audit = await loadAudit(request.url);
+    const siteUrl = new URL(request.url).origin;
+    const report = buildReport({ stats, audit, generatedAt, days, siteUrl });
 
     return json({
-      generatedAt: new Date().toISOString(),
+      generatedAt,
       days,
       includeTests,
       truncated: all.length >= ROW_LIMIT,
       rowsRead: all.length,
       testRowsHidden: includeTests ? 0 : all.length - used.length,
-      ...report
+      ...stats,
+      audit,
+      report,
+      reportHtml: renderReportHtml(report, { includeTitle: false }),
+      reportDocument: renderReportDocument(report),
+      agentsCsv: agentsCsv(stats)
     }, 200);
   }
 };

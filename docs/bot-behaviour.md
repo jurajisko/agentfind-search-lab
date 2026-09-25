@@ -136,3 +136,48 @@ si pozrel pravidla.
 - Frazy, impresie a pozicie tu nie su. Tie su iba v Search Console a Bing
   Webmaster Tools.
 - Tieto data nepovedia, preco nieco odporucil do vysledkov. Povedia, co si vzal.
+
+## Pokus s formatmi (od 25. 9. 2026)
+
+Kazdy clanok existuje v troch verziach s rovnakym obsahom:
+
+| Verzia | Adresa | `resource_kind` |
+|---|---|---|
+| HTML | `/sekcia/clanok/` | `guide` |
+| Markdown | `/sekcia/clanok.md` | `guide_md` |
+| JSON | `/sekcia/clanok.json` | `guide_json` |
+
+K tomu `/llms.txt` (zoznam clankov s odkazmi na Markdown, `llms_txt`) a
+`/llms-full.txt` (cely web v jednom subore, `llms_full`).
+
+Pravidla, aby pokus nepokazil ostatne merania:
+
+- Markdown a JSON kopiruju variant clanku. Zakladny clanok nema FAQ ani fakty
+  v ziadnom formate.
+- Alternativy nie su v sitemape a maju hlavicku `X-Robots-Tag: noindex`, aby
+  ich vyhladavace nezaradili ako duplikat HTML. Bot hlavicku uvidi az po
+  stiahnuti, takze na meranie stahovania nema vplyv.
+- Agent sa k nim dostane trema cestami: `<link rel="alternate">` v hlavicke,
+  viditelny odkaz pod clankom, alebo `llms.txt`.
+
+Vysledky ukazuje admin v karte "Formaty".
+
+## Sprava pre firmu a pristupna verzia
+
+Admin ma kartu "Sprava": zhrnutie ludskou recou, cestu k odporucaniu
+(pristupnost, objavitelnost, pokrytie, citacie), grafy aktivity, pokusu s FAQ a
+formatov, a zoznam "co pomaha a co skodi". Ku kazdemu grafu je tabulka.
+
+Tu istu spravu v textovej podobe ma `/admin/pristupna/` pre citac obrazovky:
+bez grafov, cislovane nadpisy urovne 2, obsah, stav vypisany slovom, spravna
+slovencina s diakritikou. Obe stranky vedia stiahnut spravu ako samostatny
+HTML dokument (pre klienta alebo tlac do PDF) a tabulku robotov ako CSV pre
+Excel.
+
+Pripravenost webu pocita audit pri kazdom builde (`src/audit.mjs`, vysledok
+v `/admin/audit.json`). Kazda kontrola uvadza, ako isto vieme, ze na nej
+zalezi: dokumentovane prevadzkovatelmi, namerane v nasich pokusoch, alebo
+hypoteza. Hypotezy sa do skore nepocitaju.
+
+Farby grafov su overene nastrojom na farbosleposť pre svetly aj tmavy rezim.
+Poradie v `--g-*` premennych v admine nemenit.
