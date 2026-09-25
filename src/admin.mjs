@@ -20,75 +20,117 @@ export function renderAdmin() {
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title>Search Lab — agenti</title>
+    <script>
+      try { if (localStorage.getItem('searchlab_admin_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
+    </script>
     <style>
-      :root { color-scheme: dark; --bg:#0b0f17; --panel:#121826; --panel2:#0f1522; --line:#232c3f; --text:#e7ebf3; --muted:#8e99b3; --accent:#5eead4; --warn:#fbbf24; --bad:#f87171; --ok:#34d399;
-        --c-search:#34d399; --c-ai:#60a5fa; --c-hidden:#f87171; --c-tool:#fbbf24; --c-browser:#8e99b3; --c-seo:#c084fc; --c-social:#f472b6; --c-monitor:#2dd4bf; --c-generic:#fb923c; --c-scan:#ef4444; --c-feed:#94a3b8;
-        --p-training:#a78bfa; --p-ai_search:#38bdf8; --p-user_fetch:#22d3ee; --p-mixed:#94a3b8; }
+      /* Light is the default on purpose and does not follow the OS setting;
+         dark only comes on through the toggle. Palette follows analyza_logov. */
+      :root { color-scheme: light;
+        --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f2ee;
+        --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+        --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+        --accent:#2a78d6; --ok:#0b8a0b; --warn:#9a6400; --bad:#d03b3b; --warn-dot:#fab219;
+        --c-search:#2a78d6; --c-ai:#1baf7a; --c-hidden:#d03b3b; --c-tool:#eb6834; --c-browser:#b5b4ab; --c-seo:#8a5cd1; --c-social:#d6609e; --c-monitor:#1a9fb0; --c-generic:#fab219; --c-scan:#8f1f1f; --c-feed:#86b6ef;
+        --p-training:#8a5cd1; --p-ai_search:#2a78d6; --p-user_fetch:#1a9fb0; --p-mixed:#898781; }
+      :root[data-theme="dark"] { color-scheme: dark;
+        --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#222221;
+        --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+        --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+        --accent:#3987e5; --ok:#3fbf5a; --warn:#fab219; --bad:#ef6a6a; --warn-dot:#fab219;
+        --c-search:#3987e5; --c-ai:#199e70; --c-hidden:#ef6a6a; --c-tool:#d95926; --c-browser:#6b6a64; --c-seo:#a27de0; --c-social:#e07ab0; --c-monitor:#2bb3c4; --c-generic:#fab219; --c-scan:#b33a3a; --c-feed:#5f93d4;
+        --p-training:#a27de0; --p-ai_search:#3987e5; --p-user_fetch:#2bb3c4; --p-mixed:#898781; }
       * { box-sizing:border-box; }
-      body { margin:0; padding:24px 16px 80px; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-      .wrap { max-width:1200px; margin:0 auto; }
-      .eyebrow { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:700; }
-      h1 { font-size:clamp(24px,4vw,36px); margin:4px 0 2px; letter-spacing:-.02em; }
-      h2 { font-size:17px; margin:0 0 4px; }
-      h3 { font-size:14px; margin:18px 0 8px; }
-      p.sub, .muted { color:var(--muted); }
-      p.sub { margin:0 0 20px; }
-      .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
-      .panel > p.muted { margin:0 0 12px; font-size:13px; }
+      html, body { margin:0; padding:0; }
+      body { background:var(--plane); color:var(--ink); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
+      .wrap { max-width:1280px; margin:0 auto; padding:24px 16px 64px; }
+      header.top { display:flex; align-items:flex-start; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+      header.top .grow { flex:1 1 320px; min-width:0; }
+      .eyebrow { font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+      h1 { font-size:22px; margin:2px 0 2px; letter-spacing:-.01em; }
+      h2 { font-size:15px; margin:0 0 4px; letter-spacing:-.005em; }
+      h3 { font-size:13px; margin:20px 0 8px; color:var(--ink-2); text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
+      p.sub, .muted { color:var(--ink-2); }
+      p.sub { margin:0; font-size:13px; }
+      .panel { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-bottom:16px; }
+      .panel > p.muted { margin:0 0 14px; font-size:13px; }
       .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
-      label { display:block; font-size:11px; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.06em; }
-      input, select, button { font:inherit; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel2); color:var(--text); }
-      button { cursor:pointer; }
-      button.primary { background:var(--accent); color:#04201d; border:0; font-weight:700; }
-      .tabs { display:flex; gap:4px; flex-wrap:wrap; }
-      .tabs button { background:transparent; border:1px solid transparent; color:var(--muted); font-weight:600; }
-      .tabs button[aria-selected="true"] { background:var(--panel2); border-color:var(--line); color:var(--text); }
-      .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
-      .tile { background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
-      .tile b { display:block; font-size:26px; line-height:1.15; font-variant-numeric:tabular-nums; }
-      .tile span { color:var(--muted); font-size:12px; }
+      label { display:block; font-size:11.5px; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
+      input, select, button { font:inherit; font-size:13px; padding:7px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); min-width:0; }
+      input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+      button { cursor:pointer; padding:7px 12px; }
+      button:hover { background:var(--surface-2); }
+      button.primary { background:var(--accent); border-color:transparent; color:#fff; font-weight:600; }
+      button.primary:hover { background:var(--accent); opacity:.9; }
+      .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin:6px 0 20px; overflow-x:auto; }
+      .tabs button { background:none; border:0; border-bottom:2px solid transparent; border-radius:0; color:var(--ink-2); font-size:13.5px; padding:9px 14px; white-space:nowrap; }
+      .tabs button:hover { color:var(--ink); background:none; }
+      .tabs button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--accent); font-weight:600; }
+      .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:12px; }
+      .tile { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px; }
+      .tile span { display:block; font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
+      .tile b { display:block; font-size:27px; font-weight:600; letter-spacing:-.02em; line-height:1.1; margin-top:4px; font-variant-numeric:tabular-nums; }
       .tile.alert b { color:var(--bad); }
       .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
       table { width:100%; border-collapse:collapse; font-size:13px; }
-      th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
-      th { color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+      th, td { text-align:left; padding:8px 10px; vertical-align:top; }
+      th { color:var(--muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; border-bottom:1px solid var(--border); }
+      td { border-bottom:1px solid var(--grid); }
       td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
       td:first-child { min-width:220px; }
+      tbody tr:hover td { background:var(--surface-2); }
       tr.click { cursor:pointer; }
-      tr.click:hover td { background:var(--panel2); }
-      .scroll { overflow-x:auto; }
-      .tag { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:700; border:1px solid currentColor; white-space:nowrap; margin:2px 4px 2px 0; }
-      .tag.ok { color:var(--ok); } .tag.warn { color:var(--warn); } .tag.bad { color:var(--bad); } .tag.muted { color:var(--muted); }
+      .scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      /* Color is only a hint: the tag text always carries the meaning. */
+      .tag { display:inline-flex; align-items:center; gap:5px; padding:1.5px 8px 1.5px 7px; border-radius:999px; font-size:11px; font-weight:600; white-space:nowrap; margin:2px 4px 2px 0;
+        border:1px solid var(--border); background:var(--surface-2); color:var(--ink-2); }
+      .tag::before { content:""; width:6px; height:6px; border-radius:50%; flex:none; background:var(--tc, var(--muted)); }
+      .tag.ok { --tc:var(--ok); color:var(--ok); }
+      .tag.warn { --tc:var(--warn-dot); color:var(--warn); }
+      .tag.bad { --tc:var(--bad); color:var(--bad); border-color:var(--bad); }
+      .tag.muted { color:var(--muted); }
       .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
-      code, .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; word-break:break-all; }
+      code, .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; word-break:break-all; }
       .ua { color:var(--muted); display:block; margin-top:2px; }
-      .bar { height:8px; background:var(--panel2); border-radius:4px; overflow:hidden; display:flex; }
+      .bar { height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden; display:flex; margin-bottom:10px; }
       .bar i { display:block; height:100%; }
-      .legend { display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:var(--muted); margin-top:8px; }
-      .hours { display:flex; align-items:flex-end; height:120px; margin-top:8px; border-bottom:1px solid var(--line); }
+      .legend { display:flex; flex-wrap:wrap; gap:16px; font-size:12.5px; color:var(--ink-2); margin-top:8px; }
+      .hours { display:flex; align-items:flex-end; height:120px; margin-top:8px; border-bottom:1px solid var(--axis); }
       .hours .col { flex:1 1 0; min-width:1px; max-width:28px; display:flex; flex-direction:column-reverse; }
       .hours .col i { display:block; width:100%; }
-      .purpose { border-left:4px solid var(--line); }
-      .score { font-weight:800; font-variant-numeric:tabular-nums; }
-      .note { color:var(--muted); font-size:12px; margin:10px 0 0; }
+      .hours .col i:last-child { border-radius:2px 2px 0 0; }
+      .purpose { border-left:4px solid var(--axis); background:var(--plane); }
+      .score { font-weight:700; font-variant-numeric:tabular-nums; }
+      .note { color:var(--muted); font-size:12.5px; margin:10px 0 0; }
       .error { color:var(--bad); }
-      .empty { color:var(--muted); padding:12px 0; }
-      .drawer { position:fixed; inset:0 0 0 auto; width:min(640px,100%); background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:20px 18px 60px; box-shadow:-20px 0 60px rgba(0,0,0,.5); z-index:10; }
+      .empty { color:var(--muted); padding:12px 0; margin:0; }
+      .ovl { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:50; }
+      .drawer { position:fixed; inset:0 0 0 auto; width:min(760px,100%); background:var(--plane); border-left:1px solid var(--border); overflow-y:auto; padding:22px 22px 60px; z-index:51; }
       .drawer .close { float:right; }
       .kv { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; margin:12px 0; }
-      .kv div { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
-      .kv b { display:block; font-size:18px; }
-      .kv span { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
-      .sig { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:6px; }
+      .kv div { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:8px 12px; }
+      .kv b { display:block; font-size:18px; font-weight:600; font-variant-numeric:tabular-nums; }
+      .kv span { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
+      .sig { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:8px 12px; margin-bottom:6px; }
       .sig b { margin-right:6px; }
       [hidden] { display:none !important; }
+      @media (max-width:640px) {
+        .wrap { padding:16px 16px 48px; }
+        .tile b { font-size:23px; }
+        .drawer { padding:18px 16px 48px; }
+      }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="eyebrow">AgentFind Search Lab</div>
-      <h1>Kto si co stiahol</h1>
-      <p class="sub">Identita je tvrdenie v User-Agent, nie overenie. Signaly su dokazy, nie istota.</p>
+      <header class="top">
+        <div class="grow">
+          <div class="eyebrow">AgentFind Search Lab</div>
+          <h1>Kto si co stiahol</h1>
+          <p class="sub">Identita je tvrdenie v User-Agent, nie overenie. Signaly su dokazy, nie istota.</p>
+        </div>
+        <button id="theme" type="button">Tmavy / svetly</button>
+      </header>
 
       <form id="login" class="panel" style="max-width:380px">
         <label for="password">Heslo</label>
@@ -120,7 +162,7 @@ export function renderAdmin() {
           <p id="status" class="note" style="margin:0 0 8px auto"></p>
         </div>
 
-        <div class="panel tabs" role="tablist" id="tabs">
+        <nav class="tabs" role="tablist" id="tabs">
           <button role="tab" data-tab="overview" aria-selected="true">Prehlad</button>
           <button role="tab" data-tab="agents">Agenti</button>
           <button role="tab" data-tab="ai">AI podla ucelu</button>
@@ -128,12 +170,13 @@ export function renderAdmin() {
           <button role="tab" data-tab="expected">Kto neprisiel</button>
           <button role="tab" data-tab="content">Obsah</button>
           <button role="tab" data-tab="events">Udalosti</button>
-        </div>
+        </nav>
 
         <div id="view"></div>
       </div>
     </div>
 
+    <div id="ovl" class="ovl" hidden></div>
     <aside id="drawer" class="drawer" hidden aria-label="Detail agenta"></aside>
 
     <script>
@@ -158,12 +201,12 @@ export function renderAdmin() {
           return new Date(v).toLocaleString('sk-SK', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
         }
         function catColor(c) { return 'var(--c-' + (CAT[c] ? c : 'generic') + ')'; }
-        function catTag(c) { return '<span class="tag" style="color:' + catColor(c) + '">' + esc(CAT[c] || c) + '</span>'; }
-        function purposeTag(p) { return p ? '<span class="tag" style="color:var(--p-' + esc(p) + ')">' + esc(PURPOSE[p] || p) + '</span>' : ''; }
+        function catTag(c) { return '<span class="tag" style="--tc:' + catColor(c) + '">' + esc(CAT[c] || c) + '</span>'; }
+        function purposeTag(p) { return p ? '<span class="tag" style="--tc:var(--p-' + esc(p) + ')">' + esc(PURPOSE[p] || p) + '</span>' : ''; }
         function yes(v, good) { return v ? '<span class="tag ' + (good ? 'ok' : 'warn') + '">ano</span>' : '<span class="tag muted">nie</span>'; }
         function token() { try { return sessionStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
         function setToken(v) { try { if (v) sessionStorage.setItem(KEY, v); else sessionStorage.removeItem(KEY); } catch (e) {} }
-        function tile(value, label, alert) { return '<div class="tile' + (alert ? ' alert' : '') + '"><b>' + esc(value) + '</b><span>' + esc(label) + '</span></div>'; }
+        function tile(value, label, alert) { return '<div class="tile' + (alert ? ' alert' : '') + '"><span>' + esc(label) + '</span><b>' + esc(value) + '</b></div>'; }
         function panel(title, intro, body) {
           return '<section class="panel"><h2>' + esc(title) + '</h2>' + (intro ? '<p class="muted">' + intro + '</p>' : '') + body + '</section>';
         }
@@ -347,7 +390,7 @@ export function renderAdmin() {
           var v = DATA.variants;
           function vrow(label, d) {
             return '<tr><td>' + esc(label) + '</td><td class="num">' + num(d.pages) + ' / ' + num(d.published) + '</td><td class="num">' + num(d.requests) + '</td>' +
-              '<td>' + d.byCategory.map(function (c) { return '<span class="tag" style="color:' + catColor(c[0]) + '">' + esc(CAT[c[0]] || c[0]) + ' ' + c[1] + '</span>'; }).join('') + '</td></tr>';
+              '<td>' + d.byCategory.map(function (c) { return '<span class="tag" style="--tc:' + catColor(c[0]) + '">' + esc(CAT[c[0]] || c[0]) + ' ' + c[1] + '</span>'; }).join('') + '</td></tr>';
           }
           var html = panel('Rozsireny verzus zakladny variant',
             'Rozsireny ma FAQ, box Rychle fakty a FAQPage v JSON-LD. Stiahnutie nie je indexacia ani citacia; porovnanie ma zmysel az pri dostatku navstev.',
@@ -355,7 +398,7 @@ export function renderAdmin() {
           var rows = DATA.pages.map(function (p) {
             return '<tr><td><span class="mono">' + esc(p.path) + '</span></td><td>' + esc(p.variant === 'structured' ? 'rozsireny' : (p.variant === 'baseline' ? 'zakladny' : p.variant)) + '</td>' +
               '<td class="num">' + num(p.requests) + '</td><td class="num">' + num(p.agents) + '</td>' +
-              '<td>' + p.categories.map(function (c) { return '<span class="tag" style="color:' + catColor(c[0]) + '">' + esc(CAT[c[0]] || c[0]) + ' ' + c[1] + '</span>'; }).join('') + '</td></tr>';
+              '<td>' + p.categories.map(function (c) { return '<span class="tag" style="--tc:' + catColor(c[0]) + '">' + esc(CAT[c[0]] || c[0]) + ' ' + c[1] + '</span>'; }).join('') + '</td></tr>';
           });
           html += panel('Stranky', '', table(['Stranka', 'Variant', '#Poziadaviek', '#Agentov', 'Kto'], rows));
           return html;
@@ -410,11 +453,12 @@ export function renderAdmin() {
           var d = el('drawer');
           d.innerHTML = html;
           d.hidden = false;
+          el('ovl').hidden = false;
           d.scrollTop = 0;
           el('close').addEventListener('click', closeAgent);
           el('close').focus();
         }
-        function closeAgent() { el('drawer').hidden = true; }
+        function closeAgent() { el('drawer').hidden = true; el('ovl').hidden = true; }
 
         /* ---------- rendering ---------- */
         var VIEWS = { overview:overview, agents:agents, ai:ai, hidden:hidden, expected:expected, content:content, events:events };
@@ -481,6 +525,13 @@ export function renderAdmin() {
         el('tests').addEventListener('change', load);
         el('logout').addEventListener('click', function () { setToken(''); DATA = null; showLogin(); });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAgent(); });
+        el('ovl').addEventListener('click', closeAgent);
+        el('theme').addEventListener('click', function () {
+          var dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+          if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+          else document.documentElement.removeAttribute('data-theme');
+          try { localStorage.setItem('searchlab_admin_theme', dark ? 'dark' : 'light'); } catch (e) {}
+        });
 
         if (token()) showApp(); else showLogin();
       }());
