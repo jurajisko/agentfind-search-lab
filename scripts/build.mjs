@@ -9,9 +9,11 @@ const directory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(directory, '..');
 const dist = path.join(root, 'dist');
 const siteUrl = (process.env.SITE_URL || 'https://agentfind-search-lab.vercel.app').replace(/\/$/, '');
+// Verification codes are public by design: they end up in every page's HTML.
+// The environment variable still wins, so a new code needs no code change.
 const verification = {
   google: process.env.GOOGLE_SITE_VERIFICATION || '',
-  bing: process.env.BING_SITE_VERIFICATION || ''
+  bing: process.env.BING_SITE_VERIFICATION || '72646074CF3F2ED5405B0B87A992289A'
 };
 const sectionDescriptions = {
   priroda: 'Pozorovanie prírody a jednoduché výpravy von.',
