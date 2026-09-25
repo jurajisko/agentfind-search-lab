@@ -137,7 +137,7 @@ si pozrel pravidla.
   Webmaster Tools.
 - Tieto data nepovedia, preco nieco odporucil do vysledkov. Povedia, co si vzal.
 
-## Pokus s formatmi (od 26. 9. 2026)
+## Pokus s formatmi (od 25. 9. 2026)
 
 Kazdy clanok existuje v troch verziach s rovnakym obsahom:
 
