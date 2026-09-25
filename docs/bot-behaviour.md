@@ -161,3 +161,23 @@ Pravidla, aby pokus nepokazil ostatne merania:
   viditelny odkaz pod clankom, alebo `llms.txt`.
 
 Vysledky ukazuje admin v karte "Formaty".
+
+## Sprava pre firmu a pristupna verzia
+
+Admin ma kartu "Sprava": zhrnutie ludskou recou, cestu k odporucaniu
+(pristupnost, objavitelnost, pokrytie, citacie), grafy aktivity, pokusu s FAQ a
+formatov, a zoznam "co pomaha a co skodi". Ku kazdemu grafu je tabulka.
+
+Tu istu spravu v textovej podobe ma `/admin/pristupna/` pre citac obrazovky:
+bez grafov, cislovane nadpisy urovne 2, obsah, stav vypisany slovom, spravna
+slovencina s diakritikou. Obe stranky vedia stiahnut spravu ako samostatny
+HTML dokument (pre klienta alebo tlac do PDF) a tabulku robotov ako CSV pre
+Excel.
+
+Pripravenost webu pocita audit pri kazdom builde (`src/audit.mjs`, vysledok
+v `/admin/audit.json`). Kazda kontrola uvadza, ako isto vieme, ze na nej
+zalezi: dokumentovane prevadzkovatelmi, namerane v nasich pokusoch, alebo
+hypoteza. Hypotezy sa do skore nepocitaju.
+
+Farby grafov su overene nastrojom na farbosleposť pre svetly aj tmavy rezim.
+Poradie v `--g-*` premennych v admine nemenit.

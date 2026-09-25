@@ -32,7 +32,15 @@ export function renderAdmin() {
         --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
         --accent:#2a78d6; --ok:#0b8a0b; --warn:#9a6400; --bad:#d03b3b; --warn-dot:#fab219;
         --c-search:#2a78d6; --c-ai:#1baf7a; --c-hidden:#d03b3b; --c-tool:#eb6834; --c-browser:#b5b4ab; --c-seo:#8a5cd1; --c-social:#d6609e; --c-monitor:#1a9fb0; --c-generic:#fab219; --c-scan:#8f1f1f; --c-feed:#86b6ef;
-        --p-training:#8a5cd1; --p-ai_search:#2a78d6; --p-user_fetch:#1a9fb0; --p-mixed:#898781; }
+        --p-training:#8a5cd1; --p-ai_search:#2a78d6; --p-user_fetch:#1a9fb0; --p-mixed:#898781;
+        /* Report chart series. This order was run through the dataviz
+           validator for both themes (CVD and normal-vision separation of
+           adjacent series): do not reorder or swap individual colours. */
+        --g-search:#2a78d6; --g-ai-search:#eb6834; --g-ai-user:#1baf7a; --g-other:#eda100; --g-ai-training:#4a3aa7; --g-hidden:#e34948;
+        --v-structured:#2a78d6; --v-baseline:#eb6834; }
+      :root[data-theme="dark"] {
+        --g-search:#3987e5; --g-ai-search:#d95926; --g-ai-user:#199e70; --g-other:#c98500; --g-ai-training:#9085e9; --g-hidden:#e66767;
+        --v-structured:#3987e5; --v-baseline:#d95926; }
       :root[data-theme="dark"] { color-scheme: dark;
         --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#222221;
         --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
@@ -119,6 +127,34 @@ export function renderAdmin() {
         .tile b { font-size:23px; }
         .drawer { padding:18px 16px 48px; }
       }
+      /* ---------- report tab ---------- */
+      .report-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; }
+      .report-actions a { color:var(--accent); font-size:13px; margin-left:4px; }
+      .headline { font-size:16px; line-height:1.5; margin:0 0 10px; }
+      .summary { margin:0; padding-left:18px; color:var(--ink-2); }
+      .summary li { margin:3px 0; }
+      .hero { display:flex; gap:28px; flex-wrap:wrap; align-items:center; }
+      .hero .score { font-size:54px; font-weight:600; letter-spacing:-.03em; line-height:1; }
+      .hero .score small { font-size:16px; color:var(--muted); font-weight:500; margin-left:4px; }
+      .stages { flex:1 1 420px; display:grid; gap:12px; }
+      .stage-top { display:flex; justify-content:space-between; gap:12px; font-size:13px; }
+      .stage-top b { font-weight:600; }
+      .stage-bar { height:8px; border-radius:4px; background:var(--surface-2); overflow:hidden; margin:5px 0 3px; }
+      .stage-bar i { display:block; height:100%; border-radius:4px; background:var(--accent); }
+      .stage p { margin:0; font-size:12.5px; color:var(--muted); }
+      .chart-box { position:relative; height:300px; }
+      .chart-box.short { height:220px; }
+      details.twin { margin-top:10px; }
+      details.twin summary, details.check summary { cursor:pointer; color:var(--ink-2); font-size:13px; }
+      details.check { border-bottom:1px solid var(--grid); padding:9px 0; }
+      details.check summary { color:var(--ink); list-style-position:outside; }
+      details.check p { margin:6px 0 0 18px; font-size:13px; color:var(--ink-2); }
+      .check-group h3 { margin-top:18px; }
+      @media print {
+        header.top button, .controls, .tabs, .report-actions, #login { display:none !important; }
+        body { background:#fff; } .panel { break-inside:avoid; border-color:#ccc; }
+        details.twin[open] summary, details.check summary { color:#000; }
+      }
     </style>
   </head>
   <body>
@@ -128,6 +164,7 @@ export function renderAdmin() {
           <div class="eyebrow">AgentFind Search Lab</div>
           <h1>Kto si co stiahol</h1>
           <p class="sub">Identita je tvrdenie v User-Agent, nie overenie. Signaly su dokazy, nie istota.</p>
+          <p class="sub" style="margin-top:6px"><a href="/admin/pristupna/" style="color:var(--accent)">Prístupná verzia pre čítač obrazovky — bez grafov, len text a tabuľky</a></p>
         </div>
         <button id="theme" type="button">Tmavy / svetly</button>
       </header>
@@ -163,7 +200,8 @@ export function renderAdmin() {
         </div>
 
         <nav class="tabs" role="tablist" id="tabs">
-          <button role="tab" data-tab="overview" aria-selected="true">Prehlad</button>
+          <button role="tab" data-tab="report" aria-selected="true">Správa</button>
+          <button role="tab" data-tab="overview" aria-selected="false">Prehlad</button>
           <button role="tab" data-tab="agents">Agenti</button>
           <button role="tab" data-tab="ai">AI podla ucelu</button>
           <button role="tab" data-tab="hidden">Skryti boti</button>
@@ -180,11 +218,12 @@ export function renderAdmin() {
     <div id="ovl" class="ovl" hidden></div>
     <aside id="drawer" class="drawer" hidden aria-label="Detail agenta"></aside>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
       (function () {
         var KEY = 'searchlab_admin';
         var DATA = null;
-        var TAB = 'overview';
+        var TAB = 'report';
         var FILTER = { category: '', q: '' };
         var CAT = {
           search:'Vyhladavac', ai:'AI', hidden:'Skryty bot', tool:'Skript / kniznica', browser:'Prehliadac',
@@ -491,13 +530,187 @@ export function renderAdmin() {
         }
         function closeAgent() { el('drawer').hidden = true; el('ovl').hidden = true; }
 
+        /* ---------- report tab ----------
+           Every chart has its data as a table right under it, and the whole
+           report exists as text on /admin/pristupna/. Colour never carries
+           meaning alone: series have a legend and statuses a word. */
+        var CHARTS = [];
+        var GROUP_VAR = { search:'--g-search', ai_search:'--g-ai-search', ai_user:'--g-ai-user', other:'--g-other', ai_training:'--g-ai-training', hidden:'--g-hidden' };
+        var STATUS = { ok:['Splnené','var(--ok)'], warn:['S výhradou','var(--warn)'], fail:['Nesplnené','var(--bad)'], test:['Overujeme','var(--muted)'], info:['Na rozhodnutie','var(--muted)'] };
+        var EVIDENCE = { documented:'dokumentované prevádzkovateľmi', measured:'namerané v našich pokusoch', hypothesis:'hypotéza, zatiaľ nepotvrdená' };
+        function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+        function destroyCharts() { CHARTS.forEach(function (c) { c.destroy(); }); CHARTS = []; }
+        function shortDay(iso) { var p = iso.split('-'); return Number(p[2]) + '. ' + Number(p[1]) + '.'; }
+        function pctText(v) { return Math.round((v || 0) * 100) + ' %'; }
+
+        function twin(caption, head, rows) {
+          return '<details class="twin"><summary>Tabuľka k grafu</summary><div class="scroll"><table><caption class="muted" style="text-align:left;padding:6px 0">' + esc(caption) + '</caption><thead><tr>' +
+            head.map(function (h, i) { return '<th scope="col"' + (i ? ' class="num"' : '') + '>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+            rows.map(function (r) { return '<tr>' + r.map(function (c, i) { return i ? '<td class="num">' + esc(c) + '</td>' : '<th scope="row" style="font-weight:500">' + esc(c) + '</th>'; }).join('') + '</tr>'; }).join('') +
+            '</tbody></table></div></details>';
+        }
+
+        function report() {
+          var R = DATA.report, A = DATA.audit;
+          if (!R) return panel('Správa', '', '<p class="empty">Server zatiaľ nevracia správu. Obnovte stránku po nasadení novej verzie.</p>');
+          var html = '<div class="report-actions">' +
+            '<button id="dl-report" type="button">Stiahnuť správu (HTML)</button>' +
+            '<button id="dl-csv" type="button">Tabuľka robotov (CSV pre Excel)</button>' +
+            '<button id="print" type="button">Tlačiť alebo uložiť ako PDF</button>' +
+            '<a href="/admin/pristupna/">Prístupná textová verzia</a></div>';
+
+          html += '<section class="panel"><h2>Zhrnutie</h2><p class="headline"><strong>' + esc(R.headline) + '</strong></p><ul class="summary">' +
+            R.summary.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul></section>';
+
+          var stages = (R.sections.filter(function (s) { return s.id === 'cesta'; })[0] || { steps: [] }).steps;
+          html += '<section class="panel"><h2>Cesta k odporúčaniu</h2><p class="muted">Aby vás vyhľadávač alebo AI mohli odporučiť, web musí prejsť štyrmi krokmi. Každý závisí od predošlého.</p><div class="hero">' +
+            '<div><div class="score">' + (A ? esc(A.score) : '–') + '<small>/ 100</small></div><div class="muted" style="font-size:12.5px">pripravenosť webu</div></div><div class="stages">' +
+            stages.map(function (st) {
+              var has = st.value !== null && st.value !== undefined;
+              return '<div class="stage"><div class="stage-top"><b>' + esc(st.label) + '</b><span>' + (has ? esc(st.value) + ' ' + esc(st.unit) : esc(st.unit)) + '</span></div>' +
+                '<div class="stage-bar" aria-hidden="true"><i style="width:' + (has ? Math.max(0, Math.min(100, st.value)) : 0) + '%"></i></div><p>' + esc(st.text) + '</p></div>';
+            }).join('') + '</div></div></section>';
+
+          var total = DATA.timeline.reduce(function (s, t) { for (var k in t.counts) s += t.counts[k]; return s; }, 0);
+          html += '<section class="panel"><h2>Aktivita robotov po dňoch</h2><p class="muted">Koľko súborov si stiahli jednotlivé skupiny robotov. Ľudia v prehliadači tu nie sú.</p>' +
+            (DATA.timeline.length ? '<div class="chart-box"><canvas id="ch-activity" role="img" aria-label="Graf: počet stiahnutí po dňoch podľa skupiny robotov, spolu ' + esc(total) + ' stiahnutí. Údaje sú v tabuľke pod grafom."></canvas></div>' +
+              twin('Počet stiahnutí po dňoch podľa skupiny robotov', ['Deň'].concat(DATA.groups.map(function (g) { return g.label; })),
+                DATA.timeline.map(function (t) { return [shortDay(t.day)].concat(DATA.groups.map(function (g) { return num(t.counts[g.id] || 0); })); }))
+              : '<p class="empty">V tomto období neprišiel žiadny robot.</p>') + '</section>';
+
+          var tested = DATA.coverage.filter(function (c) { return c.id !== 'other' && c.id !== 'hidden'; });
+          html += '<section class="panel"><h2>Pokus: pomáhajú časté otázky?</h2><p class="muted">Aký podiel návodov si skupina robotov stiahla z rozšíreného variantu (s FAQ a dátami FAQPage) a zo základného. Kým sa rozsahy v tabuľke prekrývajú, rozdiel môže byť náhoda.</p>' +
+            '<div class="chart-box short"><canvas id="ch-variant" role="img" aria-label="Graf: podiel stiahnutých návodov podľa variantu pre každú skupinu robotov. Údaje sú v tabuľke pod grafom."></canvas></div>' +
+            twin('Podiel stiahnutých návodov podľa variantu', ['Skupina robotov', 'Rozšírený', 'Základný'], tested.map(function (c) {
+              var a = c.byVariant.structured, b = c.byVariant.baseline;
+              return [c.label, a.fetched + ' z ' + a.published + ' (' + pctText(a.share) + ', rozsah ' + pctText(a.interval.low) + '–' + pctText(a.interval.high) + ')',
+                               b.fetched + ' z ' + b.published + ' (' + pctText(b.share) + ', rozsah ' + pctText(b.interval.low) + '–' + pctText(b.interval.high) + ')'];
+            })) + '</section>';
+
+          if (DATA.formats) {
+            html += '<section class="panel"><h2>Ktorý formát si roboty vyberajú</h2><p class="muted">Rovnaký obsah ako HTML stránka, Markdown, JSON, llms.txt a celý web v llms-full.txt.</p>' +
+              '<div class="chart-box short"><canvas id="ch-formats" role="img" aria-label="Graf: počet stiahnutí podľa formátu. Údaje sú v tabuľke pod grafom."></canvas></div>' +
+              twin('Stiahnutia podľa formátu', ['Formát', 'Stiahnutí'], DATA.formats.columns.map(function (c) { return [c.label, num(DATA.formats.totals[c.id])]; })) + '</section>';
+          }
+
+          if (A) {
+            var groups = [['Čo treba opraviť', ['fail', 'warn'], 'Nič, všetky kontroly sú splnené.'], ['Čo je v poriadku', ['ok'], 'Zatiaľ nič.'], ['Čo overujeme', ['test'], 'Nič.'], ['Na vaše rozhodnutie', ['info'], 'Nič.']];
+            html += '<section class="panel"><h2>Čo pomáha a čo škodí</h2><p class="muted">Kontroly webu. Kliknutím zobrazíte, prečo na nich záleží a ako isto to vieme. Hypotézy sa do skóre nepočítajú.</p>' +
+              groups.map(function (g) {
+                var items = A.checks.filter(function (c) { return g[1].indexOf(c.status) >= 0; });
+                return '<div class="check-group"><h3>' + esc(g[0]) + '</h3>' + (items.length ? items.map(function (c) {
+                  var s = STATUS[c.status] || [c.status, 'var(--muted)'];
+                  return '<details class="check"><summary><span class="tag" style="--tc:' + s[1] + '">' + esc(s[0]) + '</span> <b>' + esc(c.title) + '</b> — ' + esc(c.result) + '</summary>' +
+                    '<p>' + esc(c.why) + '</p><p>Istota: ' + esc(EVIDENCE[c.evidence] || c.evidence) + '.</p></details>';
+                }).join('') : '<p class="empty">' + esc(g[2]) + '</p>') + '</div>';
+              }).join('') + '</section>';
+          }
+          return html;
+        }
+
+        function download(name, type, content) {
+          var blob = new Blob([content], { type: type });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob); a.download = name;
+          document.body.appendChild(a); a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        }
+
+        function baseOptions() {
+          return {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: {
+              legend: { position: 'top', align: 'start', labels: { color: cssVar('--ink-2'), boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: 'rectRounded', padding: 14 } },
+              tooltip: { backgroundColor: cssVar('--surface'), titleColor: cssVar('--ink'), bodyColor: cssVar('--ink-2'), borderColor: cssVar('--axis'), borderWidth: 1, padding: 10 }
+            },
+            scales: {
+              x: { grid: { color: cssVar('--grid'), drawTicks: false }, border: { color: cssVar('--axis') }, ticks: { color: cssVar('--muted'), padding: 6 } },
+              y: { grid: { color: cssVar('--grid'), drawTicks: false }, border: { display: false }, ticks: { color: cssVar('--muted'), padding: 6 }, beginAtZero: true }
+            }
+          };
+        }
+
+        function drawCharts() {
+          destroyCharts();
+          if (TAB !== 'report' || !DATA || !DATA.report) return;
+          var dlr = el('dl-report'), dlc = el('dl-csv'), pr = el('print');
+          var stamp = new Date().toISOString().slice(0, 10);
+          if (dlr) dlr.addEventListener('click', function () { download('sprava-viditelnosti-' + stamp + '.html', 'text/html;charset=utf-8', DATA.reportDocument); });
+          if (dlc) dlc.addEventListener('click', function () { download('roboty-' + stamp + '.csv', 'text/csv;charset=utf-8', DATA.agentsCsv); });
+          if (pr) pr.addEventListener('click', function () { window.print(); });
+
+          if (!window.Chart) {
+            var twins = el('view').querySelectorAll('details.twin');
+            for (var i = 0; i < twins.length; i++) twins[i].open = true;
+            el('status').textContent = 'Grafy sa nepodarilo načítať, údaje sú v tabuľkách.';
+            return;
+          }
+          Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+          Chart.defaults.font.size = 12;
+          var surface = cssVar('--surface');
+
+          var activity = el('ch-activity');
+          if (activity) {
+            var o = baseOptions();
+            o.scales.x.stacked = true; o.scales.y.stacked = true; o.scales.y.ticks.precision = 0;
+            o.plugins.tooltip.mode = 'index';
+            CHARTS.push(new Chart(activity, { type: 'bar', options: o, data: {
+              labels: DATA.timeline.map(function (t) { return shortDay(t.day); }),
+              datasets: DATA.groups.map(function (g) {
+                return { label: g.label, data: DATA.timeline.map(function (t) { return t.counts[g.id] || 0; }),
+                  backgroundColor: cssVar(GROUP_VAR[g.id]), borderColor: surface, borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+                  borderSkipped: false, borderRadius: 2, maxBarThickness: 28 };
+              })
+            } }));
+          }
+
+          var variant = el('ch-variant');
+          if (variant) {
+            var tested = DATA.coverage.filter(function (c) { return c.id !== 'other' && c.id !== 'hidden'; });
+            var ov = baseOptions();
+            ov.indexAxis = 'y';
+            ov.scales.x.max = 100; ov.scales.x.ticks.callback = function (v) { return v + ' %'; };
+            ov.scales.y.grid.display = false;
+            ov.plugins.tooltip.callbacks = { label: function (ctx) {
+              var d = tested[ctx.dataIndex].byVariant[ctx.datasetIndex === 0 ? 'structured' : 'baseline'];
+              return ctx.dataset.label + ': ' + d.fetched + ' z ' + d.published + ' (' + pctText(d.share) + ', rozsah ' + pctText(d.interval.low) + '–' + pctText(d.interval.high) + ')';
+            } };
+            CHARTS.push(new Chart(variant, { type: 'bar', options: ov, data: {
+              labels: tested.map(function (c) { return c.label; }),
+              datasets: [['Rozšírený (s FAQ)', 'structured', '--v-structured'], ['Základný', 'baseline', '--v-baseline']].map(function (v) {
+                return { label: v[0], data: tested.map(function (c) { return Math.round(c.byVariant[v[1]].share * 100); }),
+                  backgroundColor: cssVar(v[2]), borderColor: surface, borderWidth: 1, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 14 };
+              })
+            } }));
+          }
+
+          var formatsCanvas = el('ch-formats');
+          if (formatsCanvas && DATA.formats) {
+            var of = baseOptions();
+            of.indexAxis = 'y'; of.plugins.legend.display = false;
+            of.scales.x.ticks.precision = 0; of.scales.y.grid.display = false;
+            CHARTS.push(new Chart(formatsCanvas, { type: 'bar', options: of, data: {
+              labels: DATA.formats.columns.map(function (c) { return c.label; }),
+              datasets: [{ label: 'Stiahnutí', data: DATA.formats.columns.map(function (c) { return DATA.formats.totals[c.id] || 0; }),
+                backgroundColor: cssVar('--g-search'), borderRadius: 4, borderSkipped: 'start', maxBarThickness: 18 }]
+            } }));
+          }
+        }
+
         /* ---------- rendering ---------- */
-        var VIEWS = { overview:overview, agents:agents, ai:ai, hidden:hidden, expected:expected, content:content, formats:formats, events:events };
+        var VIEWS = { report:report, overview:overview, agents:agents, ai:ai, hidden:hidden, expected:expected, content:content, formats:formats, events:events };
         function render() {
           if (!DATA) return;
+          destroyCharts();
           el('view').innerHTML = VIEWS[TAB]();
           var rows = el('view').querySelectorAll('tr.click');
-          for (var i = 0; i < rows.length; i++) rows[i].addEventListener('click', function () { openAgent(Number(this.getAttribute('data-i'))); });
+          for (var i = 0; i < rows.length; i++) {
+            // Rows open the agent detail with the keyboard too, not only the mouse.
+            rows[i].tabIndex = 0;
+            rows[i].addEventListener('click', function () { openAgent(Number(this.getAttribute('data-i'))); });
+            rows[i].addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAgent(Number(this.getAttribute('data-i'))); } });
+          }
+          drawCharts();
           var fcat = el('fcat');
           if (fcat) fcat.addEventListener('change', function () { FILTER.category = this.value; render(); });
           var fq = el('fq');
@@ -562,6 +775,17 @@ export function renderAdmin() {
           if (dark) document.documentElement.setAttribute('data-theme', 'dark');
           else document.documentElement.removeAttribute('data-theme');
           try { localStorage.setItem('searchlab_admin_theme', dark ? 'dark' : 'light'); } catch (e) {}
+          // Charts read their colours from CSS variables, so redraw them.
+          render();
+        });
+        // Arrow keys move between tabs, as screen-reader users expect of a tablist.
+        el('tabs').addEventListener('keydown', function (e) {
+          if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+          var all = [].slice.call(el('tabs').querySelectorAll('button[data-tab]'));
+          var i = all.indexOf(document.activeElement);
+          if (i < 0) return;
+          var next = all[(i + (e.key === 'ArrowRight' ? 1 : all.length - 1)) % all.length];
+          next.focus(); next.click();
         });
 
         if (token()) showApp(); else showLogin();

@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node --check scripts/build.mjs && node --check src/content.mjs && node --check src/templates.mjs && node --check middleware.js && node --check scripts/seed-test-events.mjs && node --check api/stats.js && node --check src/admin.mjs && node --check src/agents.mjs && node --check src/behaviour.mjs && node --check src/formats.mjs && node --test middleware.test.mjs api/stats.test.mjs src/behaviour.test.mjs src/formats.test.mjs"
+    "check": "node --check scripts/build.mjs && node --check src/content.mjs && node --check src/templates.mjs && node --check middleware.js && node --check scripts/seed-test-events.mjs && node --check api/stats.js && node --check src/admin.mjs && node --check src/agents.mjs && node --check src/behaviour.mjs && node --check src/formats.mjs && node --check src/audit.mjs && node --check src/report.mjs && node --check src/admin-accessible.mjs && node --test middleware.test.mjs api/stats.test.mjs src/behaviour.test.mjs src/formats.test.mjs src/audit.test.mjs src/report.test.mjs"
   }
 }
