@@ -169,6 +169,7 @@ export function renderAdmin() {
           <button role="tab" data-tab="hidden">Skryti boti</button>
           <button role="tab" data-tab="expected">Kto neprisiel</button>
           <button role="tab" data-tab="content">Obsah</button>
+          <button role="tab" data-tab="formats">Formaty</button>
           <button role="tab" data-tab="events">Udalosti</button>
         </nav>
 
@@ -404,6 +405,36 @@ export function renderAdmin() {
           return html;
         }
 
+        function formats() {
+          var F = DATA.formats;
+          if (!F) return panel('Formaty', '', '<p class="empty">Server zatial nevracia udaje o formatoch.</p>');
+          var cols = F.columns;
+          var html = '<div class="tiles" style="margin-bottom:16px">' + cols.map(function (c) { return tile(num(F.totals[c.id]), c.label); }).join('') + '</div>';
+
+          var p = F.pairs;
+          html += panel('Pri tom istom clanku',
+            'Kazdy clanok existuje ako HTML, Markdown aj JSON. Ktoru verziu si agent pri konkretnom clanku vzal?',
+            '<div class="tiles">' + tile(num(p.htmlOnly), 'len HTML') + tile(num(p.alternateOnly), 'len Markdown alebo JSON') + tile(num(p.both), 'HTML aj alternativu') + '</div>' +
+            '<p class="note">"Len Markdown alebo JSON" znamena, ze agent HTML obisiel: nasiel alternativu cez llms.txt alebo odkaz a vzal si rovno ju.</p>');
+
+          var head = ['Druh'].concat(cols.map(function (c) { return '#' + c.label; }));
+          var catRows = F.byCategory.map(function (r) {
+            return '<tr><td>' + catTag(r.id) + '</td>' + cols.map(function (c) { return '<td class="num">' + num(r.counts[c.id]) + '</td>'; }).join('') + '</tr>';
+          });
+          html += panel('Formaty podla druhu agenta', '', table(head, catRows, 'Zatial si nikto nevzal ziadny format.'));
+
+          var agentRows = F.agents.map(function (a) {
+            var i = agentIndex(a.key);
+            return '<tr class="click" data-i="' + i + '"><td>' + esc(a.named ? a.name : (a.category === 'hidden' ? 'Skryty bot' : 'Nepredstavil sa')) +
+              '<span class="ua mono">' + esc(a.key) + '</span></td><td>' + catTag(a.category) + purposeTag(a.purpose) + '</td>' +
+              cols.map(function (c) { return '<td class="num">' + (a.counts[c.id] ? num(a.counts[c.id]) : '<span class="muted">-</span>') + '</td>'; }).join('') + '</tr>';
+          });
+          html += panel('Kto si co vybral',
+            'Markdown, JSON a llms.txt nie su v sitemape a maju hlavicku noindex. Kto si ich vzal, nasiel ich cez odkaz v stranke alebo cez llms.txt.',
+            table(['Agent', 'Druh a ucel'].concat(cols.map(function (c) { return '#' + c.label; })), agentRows, 'Zatial nikto.'));
+          return html;
+        }
+
         function events() {
           var rows = DATA.recent.map(function (r) {
             return '<tr><td>' + esc(time(r.at)) + '</td><td><span class="mono">' + esc(r.path) + '</span></td><td>' + esc(r.kind) + '</td>' +
@@ -461,7 +492,7 @@ export function renderAdmin() {
         function closeAgent() { el('drawer').hidden = true; el('ovl').hidden = true; }
 
         /* ---------- rendering ---------- */
-        var VIEWS = { overview:overview, agents:agents, ai:ai, hidden:hidden, expected:expected, content:content, events:events };
+        var VIEWS = { overview:overview, agents:agents, ai:ai, hidden:hidden, expected:expected, content:content, formats:formats, events:events };
         function render() {
           if (!DATA) return;
           el('view').innerHTML = VIEWS[TAB]();

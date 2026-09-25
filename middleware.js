@@ -54,6 +54,12 @@ const browserPattern = /(chrome|crios|safari|firefox|fxios|edg|opr|opera)\//i;
 const resourceKinds = [
   ['robots', /^\/robots\.txt$/],
   ['sitemap', /^\/sitemap\.xml$/],
+  // Alternate formats of the same guide. They must be matched before "guide",
+  // whose pattern would otherwise swallow /section/slug.md as well.
+  ['llms_txt', /^\/llms\.txt$/],
+  ['llms_full', /^\/llms-full\.txt$/],
+  ['guide_md', /^\/[^/]+\/[^/]+\.md$/],
+  ['guide_json', /^\/[^/]+\/[^/]+\.json$/],
   ['manifest', /^\/site\.webmanifest$/],
   ['stylesheet', /\.css$/],
   ['icon', /\.(?:ico|png|svg|jpg|jpeg|webp|gif)$/],

@@ -136,3 +136,28 @@ si pozrel pravidla.
 - Frazy, impresie a pozicie tu nie su. Tie su iba v Search Console a Bing
   Webmaster Tools.
 - Tieto data nepovedia, preco nieco odporucil do vysledkov. Povedia, co si vzal.
+
+## Pokus s formatmi (od 26. 9. 2026)
+
+Kazdy clanok existuje v troch verziach s rovnakym obsahom:
+
+| Verzia | Adresa | `resource_kind` |
+|---|---|---|
+| HTML | `/sekcia/clanok/` | `guide` |
+| Markdown | `/sekcia/clanok.md` | `guide_md` |
+| JSON | `/sekcia/clanok.json` | `guide_json` |
+
+K tomu `/llms.txt` (zoznam clankov s odkazmi na Markdown, `llms_txt`) a
+`/llms-full.txt` (cely web v jednom subore, `llms_full`).
+
+Pravidla, aby pokus nepokazil ostatne merania:
+
+- Markdown a JSON kopiruju variant clanku. Zakladny clanok nema FAQ ani fakty
+  v ziadnom formate.
+- Alternativy nie su v sitemape a maju hlavicku `X-Robots-Tag: noindex`, aby
+  ich vyhladavace nezaradili ako duplikat HTML. Bot hlavicku uvidi az po
+  stiahnuti, takze na meranie stahovania nema vplyv.
+- Agent sa k nim dostane trema cestami: `<link rel="alternate">` v hlavicke,
+  viditelny odkaz pod clankom, alebo `llms.txt`.
+
+Vysledky ukazuje admin v karte "Formaty".

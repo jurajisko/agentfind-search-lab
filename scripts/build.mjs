@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guides, sections as rawSections, variantFor } from '../src/content.mjs';
 import { renderAdmin } from '../src/admin.mjs';
+import { guideJson, guideMarkdown, jsonPath, llmsFullTxt, llmsTxt, markdownPath } from '../src/formats.mjs';
 import { renderGuide, renderHome, renderResearch, renderSection } from '../src/templates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -65,7 +66,14 @@ for (const section of sections) {
 for (const guide of augmentedGuides) {
   const related = augmentedGuides.filter(item => item.section === guide.section && item.slug !== guide.slug).slice(0, 3);
   await write(`${guide.section}/${guide.slug}/index.html`, renderGuide({ guide, section: sectionFor(guide.section), related, siteUrl, verification }));
+  // Same guide in other formats, to measure which one crawlers ask for.
+  // Kept out of the sitemap and served with noindex (vercel.json): they are
+  // alternates of the HTML page, not pages of their own.
+  await write(markdownPath(guide).slice(1), guideMarkdown(guide, { section: sectionFor(guide.section), siteUrl }));
+  await write(jsonPath(guide).slice(1), guideJson(guide, { section: sectionFor(guide.section), siteUrl }));
 }
+await write('llms.txt', llmsTxt({ guides: augmentedGuides, sections, siteUrl }));
+await write('llms-full.txt', llmsFullTxt({ guides: augmentedGuides, sections, siteUrl }));
 
 const sitemapPaths = ['/', '/research/', ...sections.map(section => `/${section.slug}/`), ...augmentedGuides.map(guidePath)];
 await write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapPaths.map(item => `  <url><loc>${url(item)}</loc></url>`).join('\n')}\n</urlset>\n`);

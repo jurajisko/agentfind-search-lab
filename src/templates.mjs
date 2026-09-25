@@ -16,9 +16,12 @@ const absolute = (siteUrl, path = '/') => `${siteUrl.replace(/\/$/, '')}${path}`
 
 const jsonLd = value => `<script type="application/ld+json">${JSON.stringify(value)}</script>`;
 
-export function pageHead({ title, description, path, siteUrl, verification, structuredData = [] }) {
+export function pageHead({ title, description, path, siteUrl, verification, structuredData = [], alternates = [] }) {
   const canonical = absolute(siteUrl, path);
   const graph = structuredData.map(jsonLd).join('\n');
+  const alternateLinks = alternates
+    .map(item => `<link rel="alternate" type="${escapeHtml(item.type)}" href="${escapeHtml(absolute(siteUrl, item.path))}">`)
+    .join('\n    ');
   const googleVerification = verification.google
     ? `<meta name="google-site-verification" content="${escapeHtml(verification.google)}">`
     : '';
@@ -32,6 +35,7 @@ export function pageHead({ title, description, path, siteUrl, verification, stru
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(description)}">
     <link rel="canonical" href="${canonical}">
+    ${alternateLinks}
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Search Lab">
     <meta property="og:title" content="${escapeHtml(title)}">
@@ -46,11 +50,11 @@ export function pageHead({ title, description, path, siteUrl, verification, stru
     ${graph}`;
 }
 
-export function layout({ title, description, path, siteUrl, verification, structuredData, content }) {
+export function layout({ title, description, path, siteUrl, verification, structuredData, alternates, content }) {
   return `<!doctype html>
 <html lang="sk">
   <head>
-    ${pageHead({ title, description, path, siteUrl, verification, structuredData })}
+    ${pageHead({ title, description, path, siteUrl, verification, structuredData, alternates })}
   </head>
   <body>
     <header class="site-header">
@@ -166,9 +170,15 @@ export function renderGuide({ guide, section, related, siteUrl, verification }) 
   </aside>` : '';
   const faq = guide.variant === 'structured' ? `<section class="faq"><h2>Časté otázky</h2>${guide.faq.map(item => `<details><summary>${escapeHtml(item.question)}</summary><p>${escapeHtml(item.answer)}</p></details>`).join('')}</section>` : '';
   const relatedCards = related.map(item => `<a href="${guidePath(item)}">${escapeHtml(item.title)} <span>→</span></a>`).join('');
+  // Same content in other formats. Advertised both in <head> and as a visible
+  // link, since some crawlers only follow anchors. Identical for both
+  // variants, so it does not bias the structured-vs-baseline comparison.
+  const markdown = `/${guide.section}/${guide.slug}.md`;
+  const json = `/${guide.section}/${guide.slug}.json`;
 
   return layout({
     title: `${guide.title} | Search Lab`, description: guide.description, path, siteUrl, verification, structuredData: schemas,
+    alternates: [{ type: 'text/markdown', path: markdown }, { type: 'application/json', path: json }],
     content: `<main class="article-shell">
       <p class="breadcrumb"><a href="/">Návody</a> / <a href="/${guide.section}/">${escapeHtml(section.label)}</a></p>
       <article>
@@ -178,6 +188,7 @@ export function renderGuide({ guide, section, related, siteUrl, verification }) 
           ${guide.body.map(block => `<section><h2>${escapeHtml(block.heading)}</h2>${block.paragraphs.map(text => `<p>${escapeHtml(text)}</p>`).join('')}${block.steps ? `<ol>${block.steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>` : ''}</section>`).join('')}
         </div>
         ${faq}
+        <p class="formats">Na strojové čítanie: <a href="${markdown}">Markdown</a> · <a href="${json}">JSON</a></p>
       </article>
       <aside class="related"><p class="eyebrow">Súvisiace návody</p><div>${relatedCards}</div></aside>
     </main>`
