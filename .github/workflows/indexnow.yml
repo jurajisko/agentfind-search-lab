@@ -1,0 +1,63 @@
+# Tells the IndexNow engines (Bing and through it Copilot, Yandex, Seznam,
+# Naver, Yep) which pages changed, right after Vercel finishes a production
+# deployment, instead of waiting until they recrawl on their own.
+#
+# Vercel reports each deployment to GitHub as a deployment status; this runs on
+# the successful production ones only. It rebuilds the deployed commit, and
+# scripts/indexnow.mjs submits the pages whose HTML differs from the last
+# submission. What was submitted is kept in the Actions cache. When the cache
+# is gone (GitHub evicts it after 7 days unused) every page is submitted once
+# again, which is harmless.
+#
+# The IndexNow key is public by design (served at /<key>.txt), so no secret is
+# needed. If the submission fails, the job fails and GitHub emails the owner.
+name: IndexNow
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: indexnow
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       startsWith(github.event.deployment.environment, 'Production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Restore the previous submission
+        uses: actions/cache/restore@v4
+        with:
+          path: .indexnow
+          key: indexnow-${{ github.run_id }}
+          restore-keys: indexnow-
+
+      - name: Build the deployed commit
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: npm run build
+
+      - name: Submit changed pages
+        run: node scripts/indexnow.mjs
+
+      - name: Remember this submission
+        uses: actions/cache/save@v4
+        with:
+          path: .indexnow
+          key: indexnow-${{ github.run_id }}

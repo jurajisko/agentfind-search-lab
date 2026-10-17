@@ -162,6 +162,60 @@ Pravidla, aby pokus nepokazil ostatne merania:
 
 Vysledky ukazuje admin v karte "Formaty".
 
+### Markdown cez hlavicku Accept
+
+Stvrta cesta k Markdownu. Ked agent v hlavicke `Accept` uprednostni
+`text/markdown` pred `text/html`, middleware mu na adrese clanku
+(`/sekcia/clanok/`) vrati rovno Markdown. Prehliadace, Googlebot ani `curl`
+Markdown nikdy nepytaju, tie dostanu HTML ako doteraz, s hlavickou
+`Link: </sekcia/clanok.md>; rel="alternate"; type="text/markdown"`.
+
+- Obsah je ten isty ako v `.md` subore, takze nejde o cloaking.
+- Odpoved ma `Vary: Accept`, aby cache nepomiesala obe verzie.
+- Takto vrateny Markdown nema `noindex`, lebo adresa je kanonicka adresa clanku.
+- V datach je to `resource_kind = 'guide_md'` s cestou HTML clanku a
+  `metadata->>'negotiated_markdown' = 'true'`. Vo formatoch sa to pocita ako
+  Markdown.
+
+Kto Markdown v `Accept` vobec posiela (aj pred touto zmenou, hlavicka sa
+uklada od zaciatku):
+
+```sql
+select coalesce(crawler_name, left(user_agent, 40)) as agent,
+       metadata->>'accept' as accept,
+       count(*) as poziadaviek,
+       count(*) filter (where metadata->>'negotiated_markdown' = 'true') as dostal_markdown
+from public.search_lab_events
+where metadata->>'accept' ilike '%markdown%'
+  and coalesce(metadata->>'is_test','false') <> 'true'
+group by 1, 2
+order by poziadaviek desc;
+```
+
+## IndexNow
+
+Po kazdom uspesnom produkcnom deployi workflow `.github/workflows/indexnow.yml`
+posle zmenene stranky na IndexNow. Odtial sa dostanu do Bingu (a tym do
+Copilota), Yandexu, Seznamu, Naveru a Yepu. Posielaju sa len nove, zmenene a
+zmazane adresy zo sitemapy, nie vsetko pri kazdom deployi.
+
+Kluc je verejny subor `/<kluc>.txt` (`src/indexnow.mjs`). Ked si ho vyhladavac
+stiahne, je to v datach ako `resource_kind = 'indexnow_key'`. Prvy zaznam od
+Bingbota potvrdzuje, ze Bing podanie prijal a overil.
+
+```sql
+select coalesce(crawler_name, left(user_agent, 40)) as agent,
+       min(occurred_at) as prvykrat, count(*) as poziadaviek
+from public.search_lab_events
+where resource_kind = 'indexnow_key'
+  and coalesce(metadata->>'is_test','false') <> 'true'
+group by 1
+order by prvykrat;
+```
+
+Ci stranky naozaj pribudli v indexe, ukaze az Bing Webmaster Tools. IndexNow
+vyhladavac len upozorni, indexovanie neslubuje.
+
 ## Sprava pre firmu a pristupna verzia
 
 Admin ma kartu "Sprava": zhrnutie ludskou recou, cestu k odporucaniu

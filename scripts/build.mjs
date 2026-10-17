@@ -6,6 +6,7 @@ import { renderAdmin } from '../src/admin.mjs';
 import { renderAccessibleAdmin } from '../src/admin-accessible.mjs';
 import { auditSite } from '../src/audit.mjs';
 import { guideJson, guideMarkdown, jsonPath, llmsFullTxt, llmsTxt, markdownPath } from '../src/formats.mjs';
+import { INDEXNOW_KEY } from '../src/indexnow.mjs';
 import { renderGuide, renderHome, renderResearch, renderSection } from '../src/templates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -84,6 +85,8 @@ await write('llms-full.txt', llmsFullTxt({ guides: augmentedGuides, sections, si
 const sitemapPaths = ['/', '/research/', ...sections.map(section => `/${section.slug}/`), ...augmentedGuides.map(guidePath)];
 await write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapPaths.map(item => `  <url><loc>${url(item)}</loc></url>`).join('\n')}\n</urlset>\n`);
 await write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${url('/sitemap.xml')}\n`);
+// IndexNow key file: engines read it to verify our submissions (scripts/indexnow.mjs).
+await write(`${INDEXNOW_KEY}.txt`, `${INDEXNOW_KEY}\n`);
 await write('site.webmanifest', JSON.stringify({ name: 'Search Lab', short_name: 'Search Lab', start_url: '/', display: 'browser', lang: 'sk' }, null, 2));
 
 // Readiness audit of the site just built. Served next to the admin page; the
