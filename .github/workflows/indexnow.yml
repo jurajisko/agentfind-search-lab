@@ -3,14 +3,14 @@
 # deployment, instead of waiting until they recrawl on their own.
 #
 # Vercel reports each deployment to GitHub as a deployment status; this runs on
-# the successful production ones only. It rebuilds the deployed commit, and
-# scripts/indexnow.mjs submits the pages whose HTML differs from the last
-# submission. What was submitted is kept in the Actions cache. When the cache
-# is gone (GitHub evicts it after 7 days unused) every page is submitted once
-# again, which is harmless.
+# the successful production ones only. It builds the deployed commit and the
+# previous successful production commit, and scripts/indexnow.mjs submits the
+# pages whose HTML differs between the two. No state is stored: the Actions
+# cache is not available to deployment_status events.
 #
 # The IndexNow key is public by design (served at /<key>.txt), so no secret is
 # needed. If the submission fails, the job fails and GitHub emails the owner.
+# A manual run (workflow_dispatch) submits every page.
 name: IndexNow
 
 on:
@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  deployments: read
 
 concurrency:
   group: indexnow
@@ -36,28 +37,37 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.deployment.sha || github.sha }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-
-      - name: Restore the previous submission
-        uses: actions/cache/restore@v4
-        with:
-          path: .indexnow
-          key: indexnow-${{ github.run_id }}
-          restore-keys: indexnow-
 
       - name: Build the deployed commit
         env:
           SITE_URL: ${{ vars.SITE_URL }}
         run: npm run build
 
-      - name: Submit changed pages
-        run: node scripts/indexnow.mjs
+      - name: Build the previous production commit
+        if: github.event_name == 'deployment_status'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          CURRENT_ID: ${{ github.event.deployment.id }}
+          CURRENT_SHA: ${{ github.event.deployment.sha }}
+          ENVIRONMENT: ${{ github.event.deployment.environment }}
+        run: |
+          previous=''
+          for row in $(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=$(jq -rn --arg e "$ENVIRONMENT" '$e|@uri')&per_page=20" \
+                         --jq ".[] | select(.id != $CURRENT_ID and .sha != \"$CURRENT_SHA\") | \"\(.id):\(.sha)\""); do
+            state=$(gh api "repos/$GITHUB_REPOSITORY/deployments/${row%%:*}/statuses?per_page=1" --jq '.[0].state')
+            if [ "$state" = success ] || [ "$state" = inactive ]; then previous=${row#*:}; break; fi
+          done
+          if [ -z "$previous" ]; then echo "No previous production deployment: every page is submitted."; exit 0; fi
+          echo "Previous production commit: $previous"
+          git worktree add -q ../previous "$previous"
+          (cd ../previous && npm run build)
+          echo "PREVIOUS_DIST=$(cd ../previous && pwd)/dist" >> "$GITHUB_ENV"
 
-      - name: Remember this submission
-        uses: actions/cache/save@v4
-        with:
-          path: .indexnow
-          key: indexnow-${{ github.run_id }}
+      - name: Submit changed pages
+        run: node scripts/indexnow.mjs ${PREVIOUS_DIST:+--previous "$PREVIOUS_DIST"}
