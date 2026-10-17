@@ -469,7 +469,7 @@ export function renderAdmin() {
               cols.map(function (c) { return '<td class="num">' + (a.counts[c.id] ? num(a.counts[c.id]) : '<span class="muted">-</span>') + '</td>'; }).join('') + '</tr>';
           });
           html += panel('Kto si co vybral',
-            'Markdown, JSON a llms.txt nie su v sitemape a maju hlavicku noindex. Kto si ich vzal, nasiel ich cez odkaz v stranke alebo cez llms.txt.',
+            'Markdown, JSON a llms.txt nie su v sitemape a maju hlavicku noindex. Kto si ich vzal, nasiel ich cez odkaz v stranke, cez llms.txt, alebo si Markdown vypytal hlavickou Accept priamo na adrese clanku.',
             table(['Agent', 'Druh a ucel'].concat(cols.map(function (c) { return '#' + c.label; })), agentRows, 'Zatial nikto.'));
           return html;
         }

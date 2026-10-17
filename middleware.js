@@ -16,7 +16,16 @@
  *
  * Identification remains a User-Agent claim. It can be spoofed and is never
  * proof that the named agent made the request.
+ *
+ * It also negotiates the format of a guide: an agent whose Accept header
+ * prefers text/markdown gets the guide's Markdown at the guide's own URL, so
+ * it no longer has to find the .md link first. Everyone else gets the HTML,
+ * with the Markdown advertised in a Link header.
  */
+import { guides } from './src/content.mjs';
+
+const guidePaths = new Set(guides.map(guide => `/${guide.section}/${guide.slug}`));
+
 const crawlerPatterns = [
   ['Googlebot', /googlebot/i],
   ['Google-Extended', /google-extended/i],
@@ -58,6 +67,8 @@ const resourceKinds = [
   // whose pattern would otherwise swallow /section/slug.md as well.
   ['llms_txt', /^\/llms\.txt$/],
   ['llms_full', /^\/llms-full\.txt$/],
+  // IndexNow key file: an engine fetches it to check a submission is ours.
+  ['indexnow_key', /^\/[0-9a-f]{32}\.txt$/],
   ['guide_md', /^\/[^/]+\/[^/]+\.md$/],
   ['guide_json', /^\/[^/]+\/[^/]+\.json$/],
   ['manifest', /^\/site\.webmanifest$/],
@@ -85,15 +96,44 @@ export function resourceKindFrom(pathname) {
   return resourceKinds.find(([, pattern]) => pattern.test(pathname))?.[0] ?? 'other';
 }
 
+/** The guide's path without the trailing slash, or null when it is not a guide. */
+export function guideBase(pathname) {
+  const base = pathname.replace(/\/$/, '');
+  return guidePaths.has(base) ? base : null;
+}
+
+/**
+ * True when the Accept header ranks Markdown at least as high as HTML. A tie
+ * goes to Markdown: nobody lists text/markdown by accident, while browsers and
+ * plain fetchers never list it at all.
+ */
+export function prefersMarkdown(accept) {
+  const quality = new Map();
+  for (const part of (accept || '').toLowerCase().split(',')) {
+    const [type, ...params] = part.split(';').map(item => item.trim());
+    if (!type) continue;
+    const q = params.find(param => param.startsWith('q='));
+    const value = q ? Number(q.slice(2)) : 1;
+    quality.set(type, Number.isFinite(value) ? value : 0);
+  }
+  const markdown = Math.max(quality.get('text/markdown') ?? 0, quality.get('text/x-markdown') ?? 0);
+  const html = quality.get('text/html') ?? quality.get('text/*') ?? quality.get('*/*') ?? 0;
+  return markdown > 0 && markdown >= html;
+}
+
 export default async function middleware(request, event) {
   const userAgent = request.headers.get('user-agent') || '';
   const crawlerName = crawlerFrom(userAgent);
   const agentClass = agentClassFrom(userAgent, crawlerName);
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const accept = request.headers.get('accept') || '';
+  const fullPath = new URL(request.url).pathname;
+  const guide = guideBase(fullPath);
+  const negotiated = Boolean(guide) && prefersMarkdown(accept);
 
   if (supabaseUrl && serviceKey && ['GET', 'HEAD'].includes(request.method)) {
-    const pathname = new URL(request.url).pathname.slice(0, 500);
+    const pathname = fullPath.slice(0, 500);
     const payload = {
       // Known crawlers keep the original event type so existing reports and
       // the queries in docs/ keep working unchanged.
@@ -102,13 +142,18 @@ export default async function middleware(request, event) {
       referrer_origin: null,
       crawler_name: crawlerName,
       agent_class: agentClass,
-      resource_kind: resourceKindFrom(pathname),
+      // What the agent received, not what the path looks like: a negotiated
+      // request counts as taking the Markdown in the format statistics.
+      resource_kind: negotiated ? 'guide_md' : resourceKindFrom(pathname),
       user_agent: userAgent.slice(0, 500),
       metadata: {
         source: 'vercel_middleware',
         verification: 'user_agent_claim_only',
         method: request.method,
-        accept: (request.headers.get('accept') || '').slice(0, 200),
+        accept: accept.slice(0, 200),
+        // True when the Markdown was served at the HTML address because of
+        // the Accept header, so this route stays separable from the .md link.
+        negotiated_markdown: negotiated,
         // Present when the agent asked for compressed or ranged content; both
         // are hints about how it fetches rather than what it wants.
         accept_encoding: (request.headers.get('accept-encoding') || '').slice(0, 120),
@@ -132,7 +177,30 @@ export default async function middleware(request, event) {
     if (event?.waitUntil) event.waitUntil(write); else await write;
   }
 
-  return new Response(null, { headers: { 'x-middleware-next': '1' } });
+  if (!guide) return new Response(null, { headers: { 'x-middleware-next': '1' } });
+
+  // Vary: the same URL now answers with two formats, so no cache may hand the
+  // Markdown to a browser or the HTML to an agent that asked for Markdown.
+  // The vercel.json rule that adds noindex to *.md matches the requested path,
+  // not the rewritten one, so the HTML address must not receive noindex here.
+  // Check after a deploy: curl -sI -H 'Accept: text/markdown' <guide URL>.
+  const markdown = `${guide}.md`;
+  if (negotiated) {
+    return new Response(null, {
+      headers: {
+        'x-middleware-rewrite': new URL(markdown, request.url).toString(),
+        'Content-Type': 'text/markdown; charset=utf-8',
+        Vary: 'Accept'
+      }
+    });
+  }
+  return new Response(null, {
+    headers: {
+      'x-middleware-next': '1',
+      Vary: 'Accept',
+      Link: `<${markdown}>; rel="alternate"; type="text/markdown"`
+    }
+  });
 }
 
 // Assets stay in the matcher on purpose: whether an agent fetches the
