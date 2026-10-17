@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { agentClassFrom, crawlerFrom, resourceKindFrom } from './middleware.js';
+import middleware, { agentClassFrom, crawlerFrom, guideBase, prefersMarkdown, resourceKindFrom } from './middleware.js';
 
 const classify = userAgent => agentClassFrom(userAgent, crawlerFrom(userAgent));
 
@@ -59,4 +59,57 @@ test('tells alternate formats of a guide apart from the HTML page', () => {
   assert.equal(resourceKindFrom('/priroda/pozorovanie-vtakov'), 'guide');
   assert.equal(resourceKindFrom('/priroda/'), 'section');
   assert.equal(resourceKindFrom('/robots.txt'), 'robots');
+});
+
+test('recognises the IndexNow key file', () => {
+  assert.equal(resourceKindFrom('/da408d8ce09675b416388d49028b52e7.txt'), 'indexnow_key');
+  assert.equal(resourceKindFrom('/llms.txt'), 'llms_txt');
+});
+
+test('Markdown is chosen only when the agent ranks it at least as high as HTML', () => {
+  assert.equal(prefersMarkdown('text/markdown'), true);
+  assert.equal(prefersMarkdown('text/markdown, text/html;q=0.9, */*;q=0.8'), true);
+  assert.equal(prefersMarkdown('text/html, text/markdown'), true);
+  assert.equal(prefersMarkdown('text/x-markdown'), true);
+  assert.equal(prefersMarkdown('text/html, text/markdown;q=0.9'), false);
+  assert.equal(prefersMarkdown('text/markdown;q=0'), false);
+  // Browsers, Googlebot and plain fetchers never ask for Markdown.
+  assert.equal(prefersMarkdown('text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'), false);
+  assert.equal(prefersMarkdown('*/*'), false);
+  assert.equal(prefersMarkdown(''), false);
+});
+
+test('only real guides are negotiated', () => {
+  assert.equal(guideBase('/priroda/pozorovanie-vtakov/'), '/priroda/pozorovanie-vtakov');
+  assert.equal(guideBase('/priroda/pozorovanie-vtakov'), '/priroda/pozorovanie-vtakov');
+  assert.equal(guideBase('/priroda/neexistuje/'), null);
+  assert.equal(guideBase('/priroda/'), null);
+  assert.equal(guideBase('/'), null);
+});
+
+const call = (path, accept) => middleware(new Request(`https://lab.test${path}`, { headers: accept ? { accept } : {} }));
+
+test('an agent asking for Markdown gets the guide Markdown at the same URL', async () => {
+  const response = await call('/priroda/pozorovanie-vtakov/', 'text/markdown, text/html;q=0.5');
+  assert.equal(response.headers.get('x-middleware-rewrite'), 'https://lab.test/priroda/pozorovanie-vtakov.md');
+  assert.equal(response.headers.get('content-type'), 'text/markdown; charset=utf-8');
+  assert.equal(response.headers.get('vary'), 'Accept');
+  assert.equal(response.headers.get('x-middleware-next'), null);
+});
+
+test('a browser gets the HTML with the Markdown advertised in a Link header', async () => {
+  const response = await call('/priroda/pozorovanie-vtakov/', 'text/html,*/*;q=0.8');
+  assert.equal(response.headers.get('x-middleware-next'), '1');
+  assert.equal(response.headers.get('x-middleware-rewrite'), null);
+  assert.equal(response.headers.get('link'), '</priroda/pozorovanie-vtakov.md>; rel="alternate"; type="text/markdown"');
+  assert.equal(response.headers.get('vary'), 'Accept');
+});
+
+test('pages that are not guides pass through untouched', async () => {
+  for (const path of ['/', '/priroda/', '/robots.txt', '/priroda/pozorovanie-vtakov.md', '/priroda/neexistuje/']) {
+    const response = await call(path, 'text/markdown');
+    assert.equal(response.headers.get('x-middleware-next'), '1', path);
+    assert.equal(response.headers.get('x-middleware-rewrite'), null, path);
+    assert.equal(response.headers.get('link'), null, path);
+  }
 });
