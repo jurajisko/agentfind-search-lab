@@ -166,3 +166,34 @@ test('derives the resource kind for rows written before the column existed', () 
   ]);
   assert.equal(report.agents[0].readRobots, true);
 });
+
+const checked = (time, path, ua, metadata) => ({ ...fetch(time, path, ua), metadata });
+
+test('counts IP check outcomes per agent and exposes forged crawlers', () => {
+  const GOOGLEBOT = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
+  const report = analyse([
+    checked('2026-10-17T10:00:00.000Z', '/', GOOGLEBOT, { ip_check: 'verified', ip_operator: 'google' }),
+    checked('2026-10-17T10:00:05.000Z', '/priroda/', GOOGLEBOT, { ip_check: 'verified', ip_operator: 'google' }),
+    checked('2026-10-17T10:01:00.000Z', '/auta/', GOOGLEBOT, { ip_check: 'spoofed', ip_operator: null }),
+    // Older rows carry no check and must not break anything.
+    fetch('2026-10-17T10:02:00.000Z', '/more/', GOOGLEBOT)
+  ]);
+  const googlebot = report.agents[0];
+  assert.deepEqual(googlebot.verification, { verified: 2, spoofed: 1 });
+  assert.deepEqual(googlebot.ipOperators, [['google', 2]]);
+  assert.equal(report.totals.verified, 1);
+  assert.equal(report.totals.spoofed, 1);
+});
+
+test('a browser identity from an AI operator range is a hidden bot', () => {
+  const report = analyse([
+    checked('2026-10-17T10:00:00.000Z', '/priroda/pozorovanie-vtakov/', MAC_CHROME, { ip_operator: 'openai', signature_agent: 'https://chatgpt.com' }),
+    checked('2026-10-17T10:00:00.400Z', '/styles.css', MAC_CHROME, { ip_operator: 'openai' }),
+    pageview('2026-10-17T10:00:01.000Z', '/priroda/pozorovanie-vtakov/')
+  ]);
+  const agent = report.agents[0];
+  // It rendered and ran JavaScript like a person; only the address gives it away.
+  assert.ok(agent.signals.some(s => s.id === 'operatorip'));
+  assert.equal(agent.category, 'hidden');
+  assert.deepEqual(agent.signatureAgents, [['https://chatgpt.com', 1]]);
+});

@@ -51,11 +51,11 @@ najdolezitejsie rozhodnutie, lebo blokovanie kazdeho ma iny nasledok:
 ## Co je pre nas nastroj najdolezitejsie
 
 **1. Boty sa daju overit, nie len tvrdit.** OpenAI, Anthropic, Perplexity,
-Apple, Mistral, DuckDuckGo aj Common Crawl zverejnuju IP rozsahy ako JSON. Dnes
-vieme o botovi len to, ako sa sam nazve. Keby middleware pri poziadavke porovnal
-IP s tymito zoznamami, mohli by sme ukladat len vysledok ("overeny OpenAI" alebo
-"tvrdi, ze je OpenAI, ale nie je") a samotnu IP stale neukladat. To je rozdiel,
-ktory beznym nastrojom chyba.
+Apple, Mistral, DuckDuckGo aj Common Crawl zverejnuju IP rozsahy ako JSON.
+Od 17. 10. 2026 to middleware robi (`src/verify.mjs`): porovna IP so zoznamami
+OpenAI, Anthropic, Perplexity, Google, Bingu, Apple, DuckDuckGo a Common Crawl
+a ulozi len vysledok ("overeny" alebo "tvrdi, ze je Googlebot, ale nie je").
+Samotnu IP stale neukladame. Popis a dotazy su v `docs/bot-behaviour.md`.
 
 **2. Bing Webmaster ukazuje citacie v Copilote.** Od 10. 2. 2026 ma funkciu
 "AI Performance": celkovy pocet citacii, pocet citovanych stranok za den,

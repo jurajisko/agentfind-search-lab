@@ -13,12 +13,19 @@
  *  - nojs: the server served the page but the client collector never reported
  *    it. The nginx analyser cannot see this; we have both sides.
  *
+ * The middleware adds the outcome of an IP check (src/verify.mjs), still
+ * without the address: whether a named crawler came from its operator's
+ * published ranges, and whose ranges a browser-like agent came from.
+ *
  * Signals are evidence, not proof.
  */
 import { CATEGORIES, EXPECTED, PURPOSES, ROLES, chromeMajor, identify } from './agents.mjs';
 import { resourceKindFrom } from '../middleware.js';
 
 export const SIGNALS = {
+  // Not a heuristic: the operator says these addresses are its robots. Weighted
+  // so it outvotes "browser" (-30) and still makes the agent hidden.
+  operatorip: { points: 60, label: 'IP robota', desc: 'Prisiel z adries, ktore prevadzkovatel (OpenAI, Google, Anthropic...) zverejnil pre svojich robotov, hoci sa tvari ako prehliadac. Plati, aj ked stranku vykreslil.' },
   noassets: { points: 30, label: 'Bez CSS', desc: 'Nacital stranku, ale nie styl. Skutocny prehliadac si styles.css stiahne pri kazdej stranke.' },
   nojs: { points: 30, label: 'Nespustil JavaScript', desc: 'Server stranku vydal, klientsky skript sa neozval. Pozor: clovek so zapnutym Do Not Track skript tiez nespusti.' },
   multiua: { points: 25, label: 'Viac identit naraz', desc: 'V tych istych 3 sekundach prisla na tu istu stranku aj ina identita prehliadaca.' },
@@ -115,6 +122,10 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
       path: row.path,
       kind: row.resource_kind || resourceKindFrom(row.path),
       ua: row.user_agent || '',
+      // IP check done by the middleware (src/verify.mjs); absent on older rows.
+      check: row.metadata?.ip_check || null,
+      ipOperator: row.metadata?.ip_operator || null,
+      signatureAgent: row.metadata?.signature_agent || null,
       id,
       key: id.named ? id.name : (row.user_agent || '(bez User-Agenta)')
     });
@@ -163,11 +174,15 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
         requests: 0, pages: 0, assets: 0, robots: 0, sitemap: 0, pagesWithoutJs: 0,
         paths: new Map(), uas: new Map(), hours: new Map(), minutes: new Map(), lastByPath: new Map(),
         repeat: false, firstSeen: f.at, lastSeen: f.at, events: [],
-        formats: new Map(), guideFormats: new Map()
+        formats: new Map(), guideFormats: new Map(),
+        checks: new Map(), ipOperators: new Map(), signatureAgents: new Map()
       };
       agents.set(f.key, a);
     }
     a.requests++;
+    if (f.check) bump(a.checks, f.check);
+    if (f.ipOperator) bump(a.ipOperators, f.ipOperator);
+    if (f.signatureAgent) bump(a.signatureAgents, f.signatureAgent);
     bump(a.paths, f.path);
     bump(a.uas, f.ua || '(prazdny)');
     bump(a.hours, f.at.slice(0, 13));
@@ -204,6 +219,7 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
     // Only agents that claim to be a browser get scored. Everything else has
     // already admitted to being automated.
     if (a.category === 'browser') {
+      if (a.ipOperators.size > 0) add('operatorip');
       if (a.pages > 0 && a.assets === 0) add('noassets');
       if (a.pages > 0 && a.pagesWithoutJs === a.pages) add('nojs');
       if (multiUaKeys.has(a.key)) add('multiua');
@@ -239,6 +255,11 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
       firstSeen: a.firstSeen,
       lastSeen: a.lastSeen,
       role: ROLES[a.name] || null,
+      // Requests per IP check outcome. One name can mix real and forged
+      // requests, so these are counts, not a single verdict.
+      verification: Object.fromEntries(a.checks),
+      ipOperators: top(a.ipOperators, 5),
+      signatureAgents: top(a.signatureAgents, 3),
       topPaths: top(a.paths, 30),
       formats: Object.fromEntries(a.formats),
       // Per guide: did the agent take only the HTML, only an alternate, or both?
@@ -386,6 +407,8 @@ export function analyse(rows, { variantByPath = new Map() } = {}) {
       suspect: agentList.filter(a => a.suspect).length,
       rendered: agentList.filter(a => a.renders).length,
       readRobots: agentList.filter(a => a.readRobots).length,
+      verified: agentList.filter(a => a.verification.verified).length,
+      spoofed: agentList.reduce((sum, a) => sum + (a.verification.spoofed || 0), 0),
       expectedMissing: expected.filter(e => e.must && !e.seen).length
     },
     categories: [...byCategory.entries()]

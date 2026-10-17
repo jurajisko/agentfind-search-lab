@@ -21,10 +21,33 @@
  * prefers text/markdown gets the guide's Markdown at the guide's own URL, so
  * it no longer has to find the .md link first. Everyone else gets the HTML,
  * with the Markdown advertised in a Link header.
+ *
+ * The claim is then checked against the IP ranges the operators publish
+ * (src/verify.mjs). Only the outcome is stored, never the address. The check
+ * runs after the response is sent, so it never slows a page down.
  */
 import { guides } from './src/content.mjs';
+import { RANGE_SOURCES, clientIp, ipFacts, loadRanges } from './src/verify.mjs';
 
 const guidePaths = new Set(guides.map(guide => `/${guide.section}/${guide.slug}`));
+
+// Ranges stay in memory per instance. A partial load is retried sooner, so a
+// briefly unreachable list does not leave its crawlers unverified for hours.
+const RANGES_TTL_MS = 6 * 3600 * 1000;
+const RANGES_RETRY_MS = 5 * 60 * 1000;
+let rangeCache = null;
+function ranges() {
+  if (!rangeCache || Date.now() > rangeCache.expires) {
+    const entry = { expires: Infinity };
+    entry.promise = loadRanges(fetch).then(index => {
+      const complete = index.size === Object.keys(RANGE_SOURCES).length;
+      entry.expires = Date.now() + (complete ? RANGES_TTL_MS : RANGES_RETRY_MS);
+      return index;
+    });
+    rangeCache = entry;
+  }
+  return rangeCache.promise;
+}
 
 const crawlerPatterns = [
   ['Googlebot', /googlebot/i],
@@ -47,6 +70,7 @@ const crawlerPatterns = [
   ['Bytespider', /bytespider/i],
   ['YandexBot', /yandexbot/i],
   ['DuckDuckBot', /duckduckbot|duckassistbot/i],
+  ['CCBot', /ccbot/i],
   ['YouBot', /youbot/i],
   ['Cohere', /cohere-ai|cohere-training-data-crawler/i],
   ['Diffbot', /diffbot/i],
@@ -158,22 +182,30 @@ export default async function middleware(request, event) {
         // are hints about how it fetches rather than what it wants.
         accept_encoding: (request.headers.get('accept-encoding') || '').slice(0, 120),
         has_referer: Boolean(request.headers.get('referer')),
+        // Web Bot Auth: the agent names the key directory its request is
+        // signed with. Recorded, not verified.
+        signature_agent: (request.headers.get('signature-agent') || '').replace(/"/g, '').trim().slice(0, 120) || null,
         is_test: request.headers.get('x-lab-test') === '1'
       }
     };
+    const ip = clientIp(request.headers);
 
-    const write = fetch(`${supabaseUrl}/rest/v1/search_lab_events`, {
-      signal: AbortSignal.timeout(3000),
-      method: 'POST',
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal'
-      },
-      body: JSON.stringify(payload)
-    }).then(result => { if (!result.ok) console.error('observed_write_failed', result.status); })
-      .catch(() => console.error('observed_write_unavailable'));
+    const write = (async () => {
+      const index = await ranges().catch(() => null);
+      Object.assign(payload.metadata, ipFacts({ crawlerName, userAgent, ip, index }));
+      const result = await fetch(`${supabaseUrl}/rest/v1/search_lab_events`, {
+        signal: AbortSignal.timeout(3000),
+        method: 'POST',
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!result.ok) console.error('observed_write_failed', result.status);
+    })().catch(() => console.error('observed_write_unavailable'));
     if (event?.waitUntil) event.waitUntil(write); else await write;
   }
 
