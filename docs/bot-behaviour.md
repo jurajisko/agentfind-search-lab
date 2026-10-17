@@ -192,6 +192,54 @@ group by 1, 2
 order by poziadaviek desc;
 ```
 
+## Overenie podla IP (od 17. 10. 2026)
+
+User-Agent je len tvrdenie. Middleware preto porovna IP poziadavky s rozsahmi,
+ktore prevadzkovatelia zverejnuju (`src/verify.mjs`, zoznamy v `RANGE_SOURCES`),
+a do `metadata` ulozi iba vysledok. **IP sa neuklada.** Porovnanie bezi az po
+odoslani odpovede, stranku nespomaluje.
+
+| Pole | Hodnota | Vyznam |
+|---|---|---|
+| `ip_check` | `verified` | meno robota sedi s IP jeho prevadzkovatela |
+| | `spoofed` | meno robota, ale IP mimo rozsahov jeho prevadzkovatela |
+| | `unlisted` | prevadzkovatel rozsahy nezverejnuje (Amazonbot, Meta, Bytespider...) |
+| | `client_side` | Claude Code: nacitava z pocitaca pouzivatela, IP preto nie je Anthropicu |
+| | `unavailable` | zoznam sa nepodarilo nacitat, nevieme |
+| | `null` | agent sa nepredstavil ako robot, nie je co overit |
+| `ip_operator` | `openai`, `google`... | v koho rozsahoch IP je, aj ked sa agent tvari ako prehliadac |
+| `signature_agent` | napr. `https://crawler.exa.ai` | hlavicka Web Bot Auth. Ulozena, podpis neoverujeme |
+
+Prehliadac z IP rozsahu robotov dostane v admine signal "IP robota" (+60) a je
+z neho skryty bot, aj keby stranku vykreslil. Tak sa ukaze napriklad agent
+ChatGPT, ktory chodi s beznym Chrome.
+
+Overene a falosne poziadavky podla robota:
+
+```sql
+select coalesce(crawler_name, '(prehliadac)') as agent,
+       metadata->>'ip_check' as overenie,
+       metadata->>'ip_operator' as ip_patri,
+       count(*) as poziadaviek
+from public.search_lab_events
+where metadata ? 'ip_check'
+  and coalesce(metadata->>'is_test','false') <> 'true'
+group by 1, 2, 3
+order by poziadaviek desc;
+```
+
+Prehliadace z rozsahov robotov (skryte AI):
+
+```sql
+select metadata->>'ip_operator' as prevadzkovatel, left(user_agent, 60) as agent,
+       count(*) as poziadaviek, min(occurred_at) as prvykrat
+from public.search_lab_events
+where crawler_name is null and metadata->>'ip_operator' is not null
+  and coalesce(metadata->>'is_test','false') <> 'true'
+group by 1, 2
+order by poziadaviek desc;
+```
+
 ## IndexNow
 
 Po kazdom uspesnom produkcnom deployi workflow `.github/workflows/indexnow.yml`

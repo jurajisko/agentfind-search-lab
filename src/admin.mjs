@@ -243,6 +243,16 @@ export function renderAdmin() {
         function catColor(c) { return 'var(--c-' + (CAT[c] ? c : 'generic') + ')'; }
         function catTag(c) { return '<span class="tag" style="--tc:' + catColor(c) + '">' + esc(CAT[c] || c) + '</span>'; }
         function purposeTag(p) { return p ? '<span class="tag" style="--tc:var(--p-' + esc(p) + ')">' + esc(PURPOSE[p] || p) + '</span>' : ''; }
+        /* IP check against the operator's published ranges. Older rows have none. */
+        function verifyTag(a) {
+          var v = a.verification || {};
+          var html = '';
+          if (v.spoofed) html += '<span class="tag bad" title="Meno robota, ale IP mimo rozsahov prevadzkovatela">' + num(v.spoofed) + ' falosnych</span>';
+          else if (v.verified) html += '<span class="tag ok" title="IP v rozsahoch, ktore prevadzkovatel zverejnil">overeny</span>';
+          if (!a.named && a.ipOperators && a.ipOperators.length) html += '<span class="tag warn" title="IP z rozsahov robotov tohto prevadzkovatela">IP: ' + esc(a.ipOperators[0][0]) + '</span>';
+          return html;
+        }
+        var CHECK = { verified: 'Overeny podla IP', spoofed: 'Falosny: IP mimo rozsahov prevadzkovatela', unlisted: 'Prevadzkovatel nezverejnuje IP rozsahy', client_side: 'Nacitava z pocitaca pouzivatela (Claude Code)', unavailable: 'Rozsahy sa nepodarilo nacitat' };
         function yes(v, good) { return v ? '<span class="tag ' + (good ? 'ok' : 'warn') + '">ano</span>' : '<span class="tag muted">nie</span>'; }
         function token() { try { return sessionStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
         function setToken(v) { try { if (v) sessionStorage.setItem(KEY, v); else sessionStorage.removeItem(KEY); } catch (e) {} }
@@ -272,6 +282,8 @@ export function renderAdmin() {
             tile(num(t.suspect), 'podozrivych') +
             tile(num(t.rendered), 'renderovalo (CSS)') +
             tile(num(t.readRobots), 'citalo robots.txt') +
+            tile(num(t.verified || 0), 'overenych podla IP') +
+            tile(num(t.spoofed || 0), 'falosnych poziadaviek', t.spoofed > 0) +
             tile(num(t.expectedMissing), 'dolezitych neprislo', t.expectedMissing > 0) +
           '</div>';
 
@@ -353,7 +365,7 @@ export function renderAdmin() {
             var i = DATA.agents.indexOf(a);
             return '<tr class="click" data-i="' + i + '"><td>' + esc(a.named ? a.name : (a.category === 'hidden' ? 'Skryty bot' : 'Nepredstavil sa')) +
               '<span class="ua mono">' + esc(a.key) + '</span></td>' +
-              '<td>' + catTag(a.category) + purposeTag(a.purpose) + (a.suspect ? '<span class="tag warn">podozrivy</span>' : '') + '</td>' +
+              '<td>' + catTag(a.category) + purposeTag(a.purpose) + verifyTag(a) + (a.suspect ? '<span class="tag warn">podozrivy</span>' : '') + '</td>' +
               '<td class="num">' + num(a.requests) + '</td><td class="num">' + num(a.distinctPaths) + '</td>' +
               '<td>' + (a.renders ? '<span class="tag ok">renderuje</span>' : '<span class="tag warn">iba text</span>') + '</td>' +
               '<td>' + (a.pages ? (a.ranJs ? '<span class="tag ok">' + a.ranJs + '/' + a.pages + '</span>' : '<span class="tag warn">nie</span>') : '<span class="tag muted">-</span>') + '</td>' +
@@ -370,7 +382,7 @@ export function renderAdmin() {
           var list = DATA.agents.filter(function (a) { return a.category === 'ai'; });
           var rows = list.map(function (a) {
             return '<tr class="click" data-i="' + DATA.agents.indexOf(a) + '"><td>' + esc(a.name) + '<span class="ua mono">' + esc(a.key) + '</span></td>' +
-              '<td>' + purposeTag(a.purpose) + '</td><td class="num">' + num(a.requests) + '</td><td class="num">' + num(a.distinctPaths) + '</td>' +
+              '<td>' + purposeTag(a.purpose) + verifyTag(a) + '</td><td class="num">' + num(a.requests) + '</td><td class="num">' + num(a.distinctPaths) + '</td>' +
               '<td>' + (a.renders ? '<span class="tag ok">ano</span>' : '<span class="tag warn">nie</span>') + '</td>' +
               '<td>' + yes(a.readRobots, true) + '</td><td>' + esc(a.role ? a.role.why : '') + '</td></tr>';
           });
@@ -505,6 +517,14 @@ export function renderAdmin() {
               '<div><span>Max za minutu</span><b>' + num(a.maxPerMinute) + '</b></div>' +
             '</div>' +
             '<p class="note">Prvykrat ' + esc(time(a.firstSeen)) + ' · naposledy ' + esc(time(a.lastSeen)) + '</p>';
+          var checks = Object.keys(a.verification || {});
+          if (checks.length || (a.ipOperators && a.ipOperators.length) || (a.signatureAgents && a.signatureAgents.length)) {
+            html += '<h3>Overenie podla IP</h3>' +
+              checks.map(function (k) { return '<div class="sig"><b>' + num(a.verification[k]) + '</b><b>' + esc(CHECK[k] || k) + '</b></div>'; }).join('') +
+              (a.ipOperators && a.ipOperators.length ? '<p class="muted">IP z rozsahov: ' + a.ipOperators.map(function (o) { return esc(o[0]) + ' (' + num(o[1]) + ')'; }).join(', ') + '</p>' : '') +
+              (a.signatureAgents && a.signatureAgents.length ? '<p class="muted">Podpisane poziadavky (Signature-Agent): ' + a.signatureAgents.map(function (s) { return '<span class="mono">' + esc(s[0]) + '</span> (' + num(s[1]) + ')'; }).join(', ') + '</p>' : '') +
+              '<p class="note">IP neukladame, iba vysledok porovnania so zoznamom, ktory prevadzkovatel zverejnuje.</p>';
+          }
           if (a.score !== null) {
             html += '<h3>Skore ' + a.score + '/100</h3>' + (a.signals.length ? a.signals.map(function (s) {
               return '<div class="sig"><b style="color:' + (s.points < 0 ? 'var(--ok)' : 'var(--warn)') + '">' + (s.points > 0 ? '+' : '') + s.points + '</b><b>' + esc(s.label) + '</b><span class="muted">' + esc(s.desc) + '</span></div>';

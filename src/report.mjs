@@ -335,12 +335,14 @@ export function agentsCsv(stats) {
     const text = String(value ?? '');
     return /[;"\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
-  const head = ['Agent', 'Druh', 'Účel', 'Stiahnutí', 'Stránok', 'Rôznych ciest', 'Renderoval (CSS)', 'Spustil JavaScript', 'Čítal robots.txt', 'Skóre skrytého bota', 'Prvá návšteva', 'Posledná návšteva', 'User-Agent'];
+  const head = ['Agent', 'Druh', 'Účel', 'Stiahnutí', 'Stránok', 'Rôznych ciest', 'Renderoval (CSS)', 'Spustil JavaScript', 'Čítal robots.txt', 'Skóre skrytého bota', 'Overené podľa IP', 'Falošné podľa IP', 'IP z rozsahov', 'Prvá návšteva', 'Posledná návšteva', 'User-Agent'];
   const rows = stats.agents.map(a => [
     a.named ? a.name : (a.category === 'hidden' ? 'Skrytý bot' : 'Nepredstavil sa'),
     a.category, a.purpose || '', a.requests, a.pages, a.distinctPaths,
     a.renders ? 'áno' : 'nie', a.pages ? `${a.ranJs} z ${a.pages}` : '', a.readRobots ? 'áno' : 'nie',
-    a.score ?? '', a.firstSeen, a.lastSeen, a.key
+    a.score ?? '', a.verification?.verified || 0, a.verification?.spoofed || 0,
+    (a.ipOperators || []).map(([operator]) => operator).join(', '),
+    a.firstSeen, a.lastSeen, a.key
   ]);
   return `﻿${[head, ...rows].map(r => r.map(cell).join(';')).join('\r\n')}\r\n`;
 }

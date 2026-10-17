@@ -105,6 +105,37 @@ test('a browser gets the HTML with the Markdown advertised in a Link header', as
   assert.equal(response.headers.get('vary'), 'Accept');
 });
 
+test('records the IP check outcome and never the address', async () => {
+  const realFetch = globalThis.fetch;
+  const written = [];
+  globalThis.fetch = async (url, init) => {
+    if (String(url).startsWith('https://db.test/')) { written.push(JSON.parse(init.body)); return new Response(null, { status: 201 }); }
+    // Every operator's list contains only 192.0.2.0/24.
+    return new Response(JSON.stringify({ prefixes: [{ ipv4Prefix: '192.0.2.0/24' }] }));
+  };
+  process.env.SUPABASE_URL = 'https://db.test';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'key';
+  try {
+    const send = (ua, ip, extra = {}) => middleware(new Request('https://lab.test/', { headers: { 'user-agent': ua, 'x-real-ip': ip, ...extra } }));
+    await send('Mozilla/5.0 (compatible; Googlebot/2.1)', '192.0.2.7');
+    await send('Mozilla/5.0 (compatible; Googlebot/2.1)', '203.0.113.5');
+    await send('Mozilla/5.0 (Macintosh) Chrome/150.0.0.0 Safari/537.36', '192.0.2.8', { 'signature-agent': '"https://chatgpt.com"' });
+    assert.equal(written.length, 3);
+    assert.equal(written[0].metadata.ip_check, 'verified');
+    assert.equal(written[1].metadata.ip_check, 'spoofed');
+    assert.equal(written[1].metadata.ip_operator, null);
+    // A browser identity from an operator's crawler range.
+    assert.equal(written[2].metadata.ip_check, null);
+    assert.ok(written[2].metadata.ip_operator);
+    assert.equal(written[2].metadata.signature_agent, 'https://chatgpt.com');
+    for (const row of written) assert.doesNotMatch(JSON.stringify(row), /192\.0\.2\.|203\.0\.113\./);
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  }
+});
+
 test('pages that are not guides pass through untouched', async () => {
   for (const path of ['/', '/priroda/', '/robots.txt', '/priroda/pozorovanie-vtakov.md', '/priroda/neexistuje/']) {
     const response = await call(path, 'text/markdown');
