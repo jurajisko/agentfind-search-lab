@@ -8,8 +8,8 @@
  * check that whoever submits URLs also controls the site.
  *
  * Only changed, new and removed URLs are submitted. Engines ask not to be sent
- * unchanged URLs again, so the previous submission is kept as a map of
- * URL -> content hash and compared with the fresh build.
+ * unchanged URLs again, so the build of the deployed commit is compared with
+ * the build of the previous production commit, as maps of URL -> page hash.
  */
 export const INDEXNOW_KEY = 'da408d8ce09675b416388d49028b52e7';
 export const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow';
